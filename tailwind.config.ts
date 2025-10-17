@@ -22,6 +22,7 @@ export default {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          hover: "hsl(var(--primary-hover))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -57,6 +58,32 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        groupColor: {
+          blue: "hsl(var(--color-blue))",
+          green: "hsl(var(--color-green))",
+          purple: "hsl(var(--color-purple))",
+          orange: "hsl(var(--color-orange))",
+          pink: "hsl(var(--color-pink))",
+          indigo: "hsl(var(--color-indigo))",
+        },
+        noteColor: {
+          white: "hsl(var(--note-white))",
+          red: "hsl(var(--note-red))",
+          orange: "hsl(var(--note-orange))",
+          yellow: "hsl(var(--note-yellow))",
+          green: "hsl(var(--note-green))",
+          blue: "hsl(var(--note-blue))",
+          purple: "hsl(var(--note-purple))",
+          gray: "hsl(var(--note-gray))",
+        },
+      },
+      backgroundImage: {
+        'gradient-primary': 'var(--gradient-primary)',
+        'gradient-hero': 'var(--gradient-hero)',
+        'gradient-card': 'var(--gradient-card)',
+      },
+      boxShadow: {
+        'glow': 'var(--shadow-glow)',
       },
       borderRadius: {
         lg: "var(--radius)",

@@ -1,0 +1,134 @@
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
+
+interface JoinGroupDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}
+
+export const JoinGroupDialog = ({ open, onOpenChange, onSuccess }: JoinGroupDialogProps) => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setLoading(true);
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile) {
+      toast({
+        title: 'Error',
+        description: 'User profile not found',
+        variant: 'destructive',
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Find group with invite code
+    const { data: group, error: findError } = await supabase
+      .from('groups')
+      .select('*')
+      .eq('invite_code', inviteCode.toUpperCase())
+      .single();
+
+    if (findError || !group) {
+      toast({
+        title: 'Error',
+        description: 'Invalid invite code',
+        variant: 'destructive',
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Check if already a member
+    if (group.members?.includes(profile.email)) {
+      toast({
+        title: 'Info',
+        description: 'You are already a member of this group',
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Add user to members
+    const { error: updateError } = await supabase
+      .from('groups')
+      .update({
+        members: [...(group.members || []), profile.email],
+      })
+      .eq('id', group.id);
+
+    setLoading(false);
+
+    if (updateError) {
+      toast({
+        title: 'Error',
+        description: updateError.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: `Joined ${group.name} successfully`,
+      });
+      setInviteCode('');
+      onOpenChange(false);
+      onSuccess();
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Join Group</DialogTitle>
+          <DialogDescription>Enter a 6-character invite code to join a group</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="code">Invite Code</Label>
+            <Input
+              id="code"
+              value={inviteCode}
+              onChange={e => setInviteCode(e.target.value.toUpperCase())}
+              placeholder="ABC123"
+              maxLength={6}
+              required
+              className="uppercase text-center text-2xl tracking-wider"
+            />
+          </div>
+
+          <Button type="submit" className="w-full bg-gradient-primary" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Joining...
+              </>
+            ) : (
+              'Join Group'
+            )}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
