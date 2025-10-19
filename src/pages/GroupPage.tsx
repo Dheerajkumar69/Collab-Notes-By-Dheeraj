@@ -1,0 +1,499 @@
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { Layout } from '@/components/Layout';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Copy, Settings, Trash2, UserX, Plus, Search } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+import { CreateNoteDialog } from '@/components/CreateNoteDialog';
+import { GroupSettings } from '@/components/GroupSettings';
+import { NoteCard } from '@/components/NoteCard';
+import { EditRequestsPanel } from '@/components/EditRequestsPanel';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+
+interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  members?: string[];
+  invite_code: string;
+  background_image_url?: string;
+  created_by: string;
+}
+
+interface Note {
+  id: string;
+  title: string;
+  content?: string | null;
+  group_id: string;
+  labels?: string[];
+  author_name?: string | null;
+  attachments?: any;
+  is_pinned?: boolean;
+  color?: string | null;
+  edit_requests?: any;
+  reactions?: any;
+  created_by: string;
+  created_at: string;
+}
+
+interface Profile {
+  id: string;
+  email: string;
+  full_name: string;
+}
+
+export default function GroupPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [group, setGroup] = useState<Group | null>(null);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [members, setMembers] = useState<Profile[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedLabel, setSelectedLabel] = useState('All');
+  const [showCreateNote, setShowCreateNote] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const isCreator = group?.created_by === user?.id;
+
+  useEffect(() => {
+    if (id) {
+      fetchGroup();
+      fetchNotes();
+      fetchMembers();
+    }
+  }, [id]);
+
+  const fetchGroup = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('groups')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      setGroup(data);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load group',
+        variant: 'destructive',
+      });
+      navigate('/dashboard');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchNotes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('group_id', id)
+        .order('is_pinned', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setNotes(data || []);
+    } catch (error: any) {
+      console.error('Error fetching notes:', error);
+    }
+  };
+
+  const fetchMembers = async () => {
+    try {
+      const { data: groupData } = await supabase
+        .from('groups')
+        .select('members, created_by')
+        .eq('id', id)
+        .single();
+
+      if (groupData) {
+        const allEmails = [...(groupData.members || [])];
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('email', allEmails);
+
+        setMembers(profiles || []);
+      }
+    } catch (error: any) {
+      console.error('Error fetching members:', error);
+    }
+  };
+
+  const copyInviteCode = () => {
+    if (group?.invite_code) {
+      navigator.clipboard.writeText(group.invite_code);
+      toast({
+        title: 'Copied!',
+        description: 'Invite code copied to clipboard',
+      });
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    try {
+      const { error } = await supabase.from('groups').delete().eq('id', id);
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Group deleted successfully',
+      });
+      navigate('/dashboard');
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete group',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRemoveMember = async (email: string) => {
+    try {
+      const updatedMembers = group?.members?.filter(m => m !== email) || [];
+      const { error } = await supabase
+        .from('groups')
+        .update({ members: updatedMembers })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Member removed successfully',
+      });
+      fetchMembers();
+      fetchGroup();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to remove member',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const allLabels = Array.from(
+    new Set(notes.flatMap(note => note.labels || []))
+  );
+
+  const filteredNotes = notes.filter(note => {
+    const matchesSearch =
+      note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      note.content?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesLabel =
+      selectedLabel === 'All' || note.labels?.includes(selectedLabel);
+    return matchesSearch && matchesLabel;
+  });
+
+  const getColorClass = (color?: string) => {
+    switch (color) {
+      case 'blue': return 'from-blue-500 to-blue-600';
+      case 'green': return 'from-green-500 to-green-600';
+      case 'purple': return 'from-purple-500 to-purple-600';
+      case 'orange': return 'from-orange-500 to-orange-600';
+      case 'pink': return 'from-pink-500 to-pink-600';
+      case 'indigo': return 'from-indigo-500 to-indigo-600';
+      default: return 'from-blue-500 to-blue-600';
+    }
+  };
+
+  const pendingEditRequests = notes.filter(note =>
+    note.edit_requests?.some((req: any) => req.status === 'pending')
+  );
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-muted-foreground">Loading...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!group) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-muted-foreground">Group not found</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <div className="min-h-screen">
+        {/* Header */}
+        <div
+          className={`bg-gradient-to-br ${getColorClass(group.color)} text-white p-8 mb-6 rounded-xl`}
+          style={
+            group.background_image_url
+              ? {
+                  backgroundImage: `url(${group.background_image_url})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }
+              : {}
+          }
+        >
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h1 className="text-4xl font-bold mb-2">{group.name}</h1>
+                {group.description && (
+                  <p className="text-white/90">{group.description}</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                {isCreator && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowSettings(true)}
+                      className="text-white hover:bg-white/20"
+                    >
+                      <Settings className="h-5 w-5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="text-white hover:bg-white/20"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-4 text-sm">
+              <Badge variant="secondary" className="bg-white/20 text-white border-0">
+                {members.length} {members.length === 1 ? 'member' : 'members'}
+              </Badge>
+              <Badge variant="secondary" className="bg-white/20 text-white border-0">
+                {notes.length} {notes.length === 1 ? 'note' : 'notes'}
+              </Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={copyInviteCode}
+                className="text-white hover:bg-white/20 h-7 px-3"
+              >
+                <Copy className="h-3 w-3 mr-1" />
+                {group.invite_code}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="max-w-7xl mx-auto px-4">
+          <Tabs defaultValue="notes" className="w-full">
+            <TabsList className="mb-6">
+              <TabsTrigger value="notes">Notes</TabsTrigger>
+              <TabsTrigger value="members">Members</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="notes">
+              {isCreator && pendingEditRequests.length > 0 && (
+                <EditRequestsPanel
+                  notes={pendingEditRequests}
+                  onReview={fetchNotes}
+                />
+              )}
+
+              {/* Search & Filter */}
+              <div className="mb-6 space-y-4">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search notes..."
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => setShowCreateNote(true)}
+                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Note
+                  </Button>
+                </div>
+
+                {allLabels.length > 0 && (
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      variant={selectedLabel === 'All' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSelectedLabel('All')}
+                    >
+                      All
+                    </Button>
+                    {allLabels.map(label => (
+                      <Button
+                        key={label}
+                        variant={selectedLabel === label ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSelectedLabel(label)}
+                      >
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Notes Grid */}
+              {filteredNotes.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
+                  {filteredNotes.map(note => (
+                    <NoteCard
+                      key={note.id}
+                      note={note}
+                      onUpdate={fetchNotes}
+                      onEdit={() => {
+                        setEditingNote(note);
+                        setShowCreateNote(true);
+                      }}
+                      isCreator={isCreator}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <Card className="p-12 text-center">
+                  <p className="text-muted-foreground mb-4">No notes yet</p>
+                  <Button
+                    onClick={() => setShowCreateNote(true)}
+                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                  >
+                    Create Your First Note
+                  </Button>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="members">
+              <div className="space-y-3">
+                {members.map(member => {
+                  const isMemberCreator = member.id === group.created_by;
+                  return (
+                    <Card
+                      key={member.id}
+                      className={`p-4 ${
+                        isMemberCreator ? 'bg-indigo-50 dark:bg-indigo-950' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarFallback className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white">
+                              {member.full_name?.charAt(0) || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{member.full_name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {member.email}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isMemberCreator && (
+                            <Badge className="bg-indigo-600 text-white">Admin</Badge>
+                          )}
+                          {isCreator && !isMemberCreator && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveMember(member.email)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <UserX className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+
+      <CreateNoteDialog
+        open={showCreateNote}
+        onOpenChange={(open) => {
+          setShowCreateNote(open);
+          if (!open) setEditingNote(null);
+        }}
+        groupId={id!}
+        onSuccess={() => {
+          fetchNotes();
+          setShowCreateNote(false);
+          setEditingNote(null);
+        }}
+        editingNote={editingNote}
+      />
+
+      {isCreator && (
+        <GroupSettings
+          open={showSettings}
+          onOpenChange={setShowSettings}
+          group={group}
+          onSuccess={fetchGroup}
+        />
+      )}
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Group</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the group and all its notes. This action
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteGroup} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Layout>
+  );
+}
