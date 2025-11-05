@@ -1,15 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Plus, Search, Users, FileText, TrendingUp, Folder } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { CreateGroupDialog } from '@/components/CreateGroupDialog';
 import { JoinGroupDialog } from '@/components/JoinGroupDialog';
-import { startOfWeek } from 'date-fns';
+import { useGroups, useProfile, useStats } from '@/hooks/supabase-hooks';
 
 interface Group {
   id: string;
@@ -23,95 +21,28 @@ interface Group {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
-  const [groups, setGroups] = useState<Group[]>([]);
+  const { data: groups = [], isLoading: groupsLoading } = useGroups();
+  const { data: userProfile, isLoading: profileLoading } = useProfile();
+  const { data: stats = { groups: 0, notes: 0 }, isLoading: statsLoading } = useStats();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('newest');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
-  const [stats, setStats] = useState({ groups: 0, notes: 0, thisWeek: 0 });
-  const [userProfile, setUserProfile] = useState<any>(null);
-
-  useEffect(() => {
-    if (user) {
-      fetchUserProfile();
-      fetchGroups();
-      fetchStats();
-    }
-  }, [user]);
-
-  const fetchUserProfile = async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-    setUserProfile(data);
-  };
-
-  const fetchGroups = async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('groups')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (data) setGroups(data);
-  };
-
-  const fetchStats = async () => {
-    if (!user) return;
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile) return;
-
-    const { data: groupsData } = await supabase
-      .from('groups')
-      .select('id, members, created_by');
-
-    const userGroups = groupsData?.filter(
-      g => g.created_by === user.id || g.members?.includes(profile.email)
-    ) || [];
-
-    const groupIds = userGroups.map(g => g.id);
-
-    const { count: notesCount } = await supabase
-      .from('notes')
-      .select('*', { count: 'exact', head: true })
-      .in('group_id', groupIds);
-
-    const weekStart = startOfWeek(new Date()).toISOString();
-    const { count: thisWeekCount } = await supabase
-      .from('notes')
-      .select('*', { count: 'exact', head: true })
-      .in('group_id', groupIds)
-      .gte('created_at', weekStart);
-
-    setStats({
-      groups: userGroups.length,
-      notes: notesCount || 0,
-      thisWeek: thisWeekCount || 0,
-    });
-  };
 
   const getColorClass = (color: string) => {
     const colorMap: Record<string, string> = {
       blue: 'from-blue-500 to-blue-600',
       green: 'from-green-500 to-green-600',
       purple: 'from-purple-500 to-purple-600',
-      orange: 'from-orange-500 to-orange-600',
+      orange: 'from-orange-500 to-orange-500',
       pink: 'from-pink-500 to-pink-600',
       indigo: 'from-indigo-500 to-indigo-600',
     };
     return colorMap[color] || colorMap.blue;
   };
 
-  const filteredGroups = groups
+  const filteredGroups = (groups as any[])
     .filter(g => g.name.toLowerCase().includes(searchTerm.toLowerCase()))
     .sort((a, b) => {
       if (sortBy === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -121,13 +52,25 @@ export default function Dashboard() {
       return 0;
     });
 
+  if (groupsLoading || profileLoading || statsLoading) {
+    return (
+      <Layout>
+        <div className="container py-8">
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="container py-8">
         {/* Welcome Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">
-            Welcome back, {userProfile?.full_name?.split(' ')[0] || 'there'}!
+            Welcome back, {(userProfile as any)?.full_name?.split(' ')[0] || 'there'}!
           </h1>
           <p className="text-muted-foreground text-lg">Manage your collaborative workspaces</p>
           <div className="flex gap-3 mt-4">
@@ -151,7 +94,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Your Groups</p>
-                  <p className="text-2xl font-bold">{stats.groups}</p>
+                  <p className="text-2xl font-bold">{(stats as any).groups}</p>
                 </div>
               </div>
             </CardContent>
@@ -165,7 +108,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Recent Notes</p>
-                  <p className="text-2xl font-bold">{stats.notes}</p>
+                  <p className="text-2xl font-bold">{(stats as any).notes}</p>
                 </div>
               </div>
             </CardContent>
@@ -179,7 +122,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">This Week</p>
-                  <p className="text-2xl font-bold">{stats.thisWeek}</p>
+                  <p className="text-2xl font-bold">{(stats as any).thisWeek || 0}</p>
                 </div>
               </div>
             </CardContent>
@@ -259,8 +202,8 @@ export default function Dashboard() {
         )}
       </div>
 
-      <CreateGroupDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} onSuccess={fetchGroups} />
-      <JoinGroupDialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen} onSuccess={fetchGroups} />
+      <CreateGroupDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} onSuccess={() => {}} />
+      <JoinGroupDialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen} onSuccess={() => {}} />
     </Layout>
   );
 }

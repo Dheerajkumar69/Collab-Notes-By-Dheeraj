@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import GroupPage from "./pages/GroupPage";
 import AllNotes from "./pages/AllNotes";
 import Admin from "./pages/Admin";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/group/:id" element={<GroupPage />} />
             <Route path="/all-notes" element={<AllNotes />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

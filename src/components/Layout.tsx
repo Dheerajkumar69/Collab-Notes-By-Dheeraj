@@ -216,6 +216,12 @@ export const Layout = ({ children }: { children: ReactNode }) => {
                   <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
                 <DropdownMenuSeparator />
+                <Link to="/profile">
+                  <DropdownMenuItem>
+                    <User size={16} className="mr-2" />
+                    Profile
+                  </DropdownMenuItem>
+                </Link>
                 <DropdownMenuItem onClick={signOut}>
                   <LogOut size={16} className="mr-2" />
                   Sign Out

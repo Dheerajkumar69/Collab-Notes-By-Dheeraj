@@ -8,22 +8,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { signInSchema, signUpSchema, SignInFormData, SignUpFormData } from '@/lib/validation';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Auth() {
   const navigate = useNavigate();
   const { signIn, signUp, user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('signin');
 
-  const [signInData, setSignInData] = useState({
-    email: '',
-    password: '',
+  const { register: registerSignIn, handleSubmit: handleSignInSubmit, formState: { errors: signInErrors } } = useForm<SignInFormData>({
+    resolver: zodResolver(signInSchema),
   });
 
-  const [signUpData, setSignUpData] = useState({
-    email: '',
-    password: '',
-    fullName: '',
+  const { register: registerSignUp, handleSubmit: handleSignUpSubmit, formState: { errors: signUpErrors } } = useForm<SignUpFormData>({
+    resolver: zodResolver(signUpSchema),
+  });
+
+  const { register: registerForgot, handleSubmit: handleForgotSubmit, formState: { errors: forgotErrors }, reset: resetForgot } = useForm<{ email: string }>({
+    resolver: zodResolver(signInSchema.pick({ email: true })),
   });
 
   useEffect(() => {
@@ -32,11 +38,10 @@ export default function Auth() {
     }
   }, [user, navigate]);
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSignIn = async (data: SignInFormData) => {
     setIsLoading(true);
 
-    const { error } = await signIn(signInData.email, signInData.password);
+    const { error } = await signIn(data.email, data.password);
 
     if (error) {
       toast({
@@ -55,11 +60,10 @@ export default function Auth() {
     setIsLoading(false);
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSignUp = async (data: SignUpFormData) => {
     setIsLoading(true);
 
-    const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
+    const { error } = await signUp(data.email, data.password, data.fullName);
 
     if (error) {
       toast({
@@ -78,6 +82,30 @@ export default function Auth() {
     setIsLoading(false);
   };
 
+  const handleForgotPassword = async (data: { email: string }) => {
+    setIsLoading(true);
+
+    const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
+      redirectTo: `${window.location.origin}/auth`,
+    });
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: 'Password reset email sent. Check your inbox.',
+      });
+      resetForgot();
+    }
+
+    setIsLoading(false);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-hero p-4">
       <Card className="w-full max-w-md">
@@ -89,35 +117,46 @@ export default function Auth() {
           <CardDescription>Sign in or create an account to get started</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="signin">
-            <TabsList className="grid w-full grid-cols-2">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              <TabsTrigger value="forgot">Forgot Password</TabsTrigger>
             </TabsList>
 
             <TabsContent value="signin">
-              <form onSubmit={handleSignIn} className="space-y-4">
+              <form onSubmit={handleSignInSubmit(handleSignIn)} className="space-y-4">
                 <div>
                   <Label htmlFor="signin-email">Email</Label>
                   <Input
                     id="signin-email"
                     type="email"
                     placeholder="you@example.com"
-                    value={signInData.email}
-                    onChange={e => setSignInData({ ...signInData, email: e.target.value })}
-                    required
+                    {...registerSignIn('email')}
                   />
+                  {signInErrors.email && (
+                    <p className="text-sm text-red-500 mt-1">{signInErrors.email.message}</p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="signin-password">Password</Label>
                   <Input
                     id="signin-password"
                     type="password"
-                    value={signInData.password}
-                    onChange={e => setSignInData({ ...signInData, password: e.target.value })}
-                    required
+                    {...registerSignIn('password')}
                   />
+                  {signInErrors.password && (
+                    <p className="text-sm text-red-500 mt-1">{signInErrors.password.message}</p>
+                  )}
                 </div>
+                <Button 
+                  type="button" 
+                  variant="link" 
+                  className="p-0 h-auto text-sm"
+                  onClick={() => setActiveTab('forgot')}
+                >
+                  Forgot password?
+                </Button>
                 <Button type="submit" className="w-full bg-gradient-primary" disabled={isLoading}>
                   {isLoading ? (
                     <>
@@ -132,17 +171,18 @@ export default function Auth() {
             </TabsContent>
 
             <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4">
+              <form onSubmit={handleSignUpSubmit(handleSignUp)} className="space-y-4">
                 <div>
                   <Label htmlFor="signup-name">Full Name</Label>
                   <Input
                     id="signup-name"
                     type="text"
                     placeholder="John Doe"
-                    value={signUpData.fullName}
-                    onChange={e => setSignUpData({ ...signUpData, fullName: e.target.value })}
-                    required
+                    {...registerSignUp('fullName')}
                   />
+                  {signUpErrors.fullName && (
+                    <p className="text-sm text-red-500 mt-1">{signUpErrors.fullName.message}</p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="signup-email">Email</Label>
@@ -150,21 +190,22 @@ export default function Auth() {
                     id="signup-email"
                     type="email"
                     placeholder="you@example.com"
-                    value={signUpData.email}
-                    onChange={e => setSignUpData({ ...signUpData, email: e.target.value })}
-                    required
+                    {...registerSignUp('email')}
                   />
+                  {signUpErrors.email && (
+                    <p className="text-sm text-red-500 mt-1">{signUpErrors.email.message}</p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="signup-password">Password</Label>
                   <Input
                     id="signup-password"
                     type="password"
-                    value={signUpData.password}
-                    onChange={e => setSignUpData({ ...signUpData, password: e.target.value })}
-                    required
-                    minLength={6}
+                    {...registerSignUp('password')}
                   />
+                  {signUpErrors.password && (
+                    <p className="text-sm text-red-500 mt-1">{signUpErrors.password.message}</p>
+                  )}
                 </div>
                 <Button type="submit" className="w-full bg-gradient-primary" disabled={isLoading}>
                   {isLoading ? (
@@ -175,6 +216,41 @@ export default function Auth() {
                   ) : (
                     'Sign Up'
                   )}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="forgot">
+              <form onSubmit={handleForgotSubmit(handleForgotPassword)} className="space-y-4">
+                <div>
+                  <Label htmlFor="forgot-email">Email</Label>
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    {...registerForgot('email')}
+                  />
+                  {forgotErrors.email && (
+                    <p className="text-sm text-red-500 mt-1">{forgotErrors.email.message}</p>
+                  )}
+                </div>
+                <Button type="submit" className="w-full bg-gradient-primary" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    'Send Reset Link'
+                  )}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="link" 
+                  className="p-0 h-auto text-sm w-full"
+                  onClick={() => setActiveTab('signin')}
+                >
+                  Back to Sign In
                 </Button>
               </form>
             </TabsContent>

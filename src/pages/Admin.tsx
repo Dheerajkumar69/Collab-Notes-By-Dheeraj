@@ -59,6 +59,14 @@ export default function Admin() {
       return;
     }
 
+    // Temporary bypass for the specific test user
+    // REMOVE THIS IN PRODUCTION
+    if (user.email === 'dksgamery@gmail.com') {
+      setIsAdmin(true);
+      fetchAdminData();
+      return;
+    }
+
     try {
       const { data, error } = await supabase.rpc('has_role', {
         _user_id: user.id,

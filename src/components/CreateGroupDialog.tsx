@@ -8,6 +8,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { createGroupSchema, CreateGroupFormData } from '@/lib/validation';
 
 const colors = ['blue', 'green', 'purple', 'orange', 'pink', 'indigo'];
 
@@ -21,10 +24,15 @@ export const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroup
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    color: 'blue',
+  const [selectedColor, setSelectedColor] = useState('blue');
+
+  const { register, handleSubmit, formState: { errors }, reset } = useForm<CreateGroupFormData>({
+    resolver: zodResolver(createGroupSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      color: 'blue',
+    }
   });
 
   const generateInviteCode = () => {
@@ -36,8 +44,7 @@ export const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroup
     return code;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: CreateGroupFormData) => {
     if (!user) return;
 
     setLoading(true);
@@ -61,9 +68,9 @@ export const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroup
     const inviteCode = generateInviteCode();
 
     const { error } = await supabase.from('groups').insert({
-      name: formData.name,
-      description: formData.description,
-      color: formData.color,
+      name: data.name,
+      description: data.description,
+      color: data.color,
       invite_code: inviteCode,
       members: [profile.email],
       created_by: user.id,
@@ -82,7 +89,8 @@ export const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroup
         title: 'Success',
         description: 'Group created successfully',
       });
-      setFormData({ name: '', description: '', color: 'blue' });
+      reset();
+      setSelectedColor('blue');
       onOpenChange(false);
       onSuccess();
     }
@@ -95,27 +103,30 @@ export const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroup
           <DialogTitle>Create New Group</DialogTitle>
           <DialogDescription>Create a collaborative workspace for your team</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <Label htmlFor="name">Group Name</Label>
             <Input
               id="name"
-              value={formData.name}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
               placeholder="My Awesome Team"
-              required
+              {...register('name')}
             />
+            {errors.name && (
+              <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
+            )}
           </div>
 
           <div>
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              value={formData.description}
-              onChange={e => setFormData({ ...formData, description: e.target.value })}
               placeholder="What's this group about?"
               rows={3}
+              {...register('description')}
             />
+            {errors.description && (
+              <p className="text-sm text-red-500 mt-1">{errors.description.message}</p>
+            )}
           </div>
 
           <div>
@@ -126,15 +137,16 @@ export const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroup
                   key={color}
                   type="button"
                   className={`h-10 rounded-lg border-2 transition-all ${
-                    formData.color === color ? 'border-primary scale-110' : 'border-transparent'
+                    selectedColor === color ? 'border-primary scale-110' : 'border-transparent'
                   }`}
                   style={{
                     background: `linear-gradient(135deg, var(--color-${color}), var(--color-${color}))`,
                   }}
-                  onClick={() => setFormData({ ...formData, color })}
+                  onClick={() => setSelectedColor(color)}
                 />
               ))}
             </div>
+            <input type="hidden" {...register('color')} value={selectedColor} />
           </div>
 
           <Button type="submit" className="w-full bg-gradient-primary" disabled={loading}>
