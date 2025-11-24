@@ -29,13 +29,6 @@ export const useGroups = () => {
       return data;
     },
     enabled: !!user,
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: `Failed to fetch groups: ${error.message}`,
-        variant: 'destructive',
-      });
-    }
   });
 };
 
@@ -60,12 +53,15 @@ export const useCreateGroup = () => {
 
       const { data, error } = await supabase
         .from('groups')
-        .insert({
-          ...newGroup,
+        .insert([{
+          name: newGroup.name || '',
+          description: newGroup.description,
+          color: newGroup.color,
+          background_image_url: newGroup.background_image_url,
           invite_code: inviteCode,
           members: [profile.email],
           created_by: user.id,
-        })
+        }])
         .select()
         .single();
 
@@ -73,7 +69,7 @@ export const useCreateGroup = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['groups', user?.id]);
+      queryClient.invalidateQueries({ queryKey: ['groups', user?.id] });
       toast({
         title: 'Success',
         description: 'Group created successfully',
@@ -109,13 +105,6 @@ export const useProfile = () => {
       return data;
     },
     enabled: !!user,
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: `Failed to fetch profile: ${error.message}`,
-        variant: 'destructive',
-      });
-    }
   });
 };
 
@@ -162,12 +151,5 @@ export const useStats = () => {
       };
     },
     enabled: !!user,
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: `Failed to fetch stats: ${error.message}`,
-        variant: 'destructive',
-      });
-    }
   });
 };
