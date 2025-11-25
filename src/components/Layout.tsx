@@ -152,7 +152,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-6">
             <Link to="/dashboard" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-primary" />
+              <img src="/logo.png" alt="CollabNotes Logo" className="h-8 w-8 rounded-lg object-contain" />
               <span className="text-xl font-bold">CollabNotes</span>
             </Link>
             <nav className="hidden md:flex items-center gap-2">
