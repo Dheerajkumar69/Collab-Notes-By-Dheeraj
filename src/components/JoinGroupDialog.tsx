@@ -42,58 +42,44 @@ export const JoinGroupDialog = ({ open, onOpenChange, onSuccess }: JoinGroupDial
       return;
     }
 
-    // Find group with invite code
-    const { data: group, error: findError } = await supabase
-      .from('groups')
-      .select('*')
-      .eq('invite_code', inviteCode.toUpperCase())
-      .single();
-
-    if (findError || !group) {
-      toast({
-        title: 'Error',
-        description: 'Invalid invite code',
-        variant: 'destructive',
-      });
-      setLoading(false);
-      return;
-    }
-
-    // Check if already a member
-    if (group.members?.includes(profile.email)) {
-      toast({
-        title: 'Info',
-        description: 'You are already a member of this group',
-      });
-      setLoading(false);
-      return;
-    }
-
-    // Add user to members
-    const { error: updateError } = await supabase
-      .from('groups')
-      .update({
-        members: [...(group.members || []), profile.email],
-      })
-      .eq('id', group.id);
+    // Call the secure database function to join the group
+    const { data, error } = await supabase.rpc('join_group_with_code', {
+      p_invite_code: inviteCode.toUpperCase(),
+      p_user_email: profile.email,
+    });
 
     setLoading(false);
 
-    if (updateError) {
+    if (error) {
       toast({
         title: 'Error',
-        description: updateError.message,
+        description: error.message,
         variant: 'destructive',
       });
-    } else {
-      toast({
-        title: 'Success',
-        description: `Joined ${group.name} successfully`,
-      });
-      setInviteCode('');
-      onOpenChange(false);
-      onSuccess();
+      return;
     }
+
+    // Type assertion for the RPC response
+    const result = data as { success: boolean; error?: string; group_name?: string; group_id?: string };
+
+    if (result && !result.success) {
+      toast({
+        title: result.error === 'Already a member' ? 'Info' : 'Error',
+        description: result.error === 'Already a member' 
+          ? `You are already a member of ${result.group_name}`
+          : result.error,
+        variant: result.error === 'Already a member' ? 'default' : 'destructive',
+      });
+      return;
+    }
+
+    toast({
+      title: 'Success',
+      description: `Joined ${result.group_name} successfully`,
+    });
+    setInviteCode('');
+    onOpenChange(false);
+    onSuccess();
   };
 
   return (
