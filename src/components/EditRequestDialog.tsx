@@ -70,20 +70,12 @@ export function EditRequestDialog({
 
       if (error) throw error;
 
-      // Create notification for note creator
-      const { data: creatorProfile } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('id', note.created_by)
-        .single();
-
-      if (creatorProfile) {
-        await supabase.from('notifications').insert({
-          recipient_email: creatorProfile.email,
-          message: `${profile?.full_name} requested to edit your note "${note.title}"`,
-          link: `/group/${note.group_id}`,
-        });
-      }
+      // Create notification for note creator using secure function
+      await supabase.rpc('create_notification', {
+        p_user_id: note.created_by,
+        p_message: `${profile?.full_name} requested to edit your note "${note.title}"`,
+        p_link: `/group/${note.group_id}`,
+      });
 
       toast({
         title: 'Success',
