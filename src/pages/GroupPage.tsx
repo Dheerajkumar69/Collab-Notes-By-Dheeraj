@@ -15,7 +15,6 @@ import { CreateNoteDialog } from '@/components/CreateNoteDialog';
 import { GroupSettings } from '@/components/GroupSettings';
 import { NoteCard } from '@/components/NoteCard';
 import { EditRequestsPanel } from '@/components/EditRequestsPanel';
-import { GroupChat } from '@/components/GroupChat';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -320,7 +319,6 @@ export default function GroupPage() {
           <Tabs defaultValue="notes" className="w-full">
             <TabsList className="mb-6">
               <TabsTrigger value="notes">Notes</TabsTrigger>
-              <TabsTrigger value="chat">Chat</TabsTrigger>
               <TabsTrigger value="members">Members</TabsTrigger>
             </TabsList>
 
@@ -403,10 +401,6 @@ export default function GroupPage() {
                   </Button>
                 </Card>
               )}
-            </TabsContent>
-
-            <TabsContent value="chat">
-              <GroupChat groupId={id!} />
             </TabsContent>
 
             <TabsContent value="members">
