@@ -41,12 +41,21 @@ export function EditRequestsPanel({ notes, onReview }: EditRequestsPanelProps) {
 
       if (error) throw error;
 
-      // Create notification
-      await supabase.from('notifications').insert({
-        recipient_email: selectedRequest.requester_email,
-        message: `Your edit request for "${selectedNote.title}" was approved`,
-        link: `/group/${selectedNote.group_id}`,
-      });
+      // Create notification using secure function
+      // Get requester user_id from email
+      const { data: requesterProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', selectedRequest.requester_email)
+        .single();
+      
+      if (requesterProfile) {
+        await supabase.rpc('create_notification', {
+          p_user_id: requesterProfile.id,
+          p_message: `Your edit request for "${selectedNote.title}" was approved`,
+          p_link: `/group/${selectedNote.group_id}`,
+        });
+      }
 
       toast({
         title: 'Success',
@@ -81,12 +90,21 @@ export function EditRequestsPanel({ notes, onReview }: EditRequestsPanelProps) {
 
       if (error) throw error;
 
-      // Create notification
-      await supabase.from('notifications').insert({
-        recipient_email: selectedRequest.requester_email,
-        message: `Your edit request for "${selectedNote.title}" was rejected`,
-        link: `/group/${selectedNote.group_id}`,
-      });
+      // Create notification using secure function
+      // Get requester user_id from email
+      const { data: requesterProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', selectedRequest.requester_email)
+        .single();
+      
+      if (requesterProfile) {
+        await supabase.rpc('create_notification', {
+          p_user_id: requesterProfile.id,
+          p_message: `Your edit request for "${selectedNote.title}" was rejected`,
+          p_link: `/group/${selectedNote.group_id}`,
+        });
+      }
 
       toast({
         title: 'Success',
