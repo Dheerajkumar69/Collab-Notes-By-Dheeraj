@@ -50,6 +50,54 @@ export type Database = {
         }
         Relationships: []
       }
+      messages: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          is_edited: boolean | null
+          message: string
+          reply_to: string | null
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          is_edited?: boolean | null
+          message: string
+          reply_to?: string | null
+          user_id: string
+          user_name: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          is_edited?: boolean | null
+          message?: string
+          reply_to?: string | null
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_reply_to_fkey"
+            columns: ["reply_to"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notes: {
         Row: {
           attachments: Json | null
@@ -116,7 +164,8 @@ export type Database = {
           is_read: boolean | null
           link: string | null
           message: string
-          recipient_email: string
+          recipient_email: string | null
+          user_id: string
         }
         Insert: {
           created_at?: string | null
@@ -124,7 +173,8 @@ export type Database = {
           is_read?: boolean | null
           link?: string | null
           message: string
-          recipient_email: string
+          recipient_email?: string | null
+          user_id: string
         }
         Update: {
           created_at?: string | null
@@ -132,7 +182,8 @@ export type Database = {
           is_read?: boolean | null
           link?: string | null
           message?: string
-          recipient_email?: string
+          recipient_email?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -180,6 +231,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_notification:
+        | {
+            Args: {
+              p_link?: string
+              p_message: string
+              p_recipient_email: string
+            }
+            Returns: string
+          }
+        | {
+            Args: { p_link?: string; p_message: string; p_user_id: string }
+            Returns: string
+          }
+      get_group_invite_code: { Args: { p_group_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
