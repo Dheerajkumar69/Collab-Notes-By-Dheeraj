@@ -244,6 +244,7 @@ export type Database = {
             Args: { p_link?: string; p_message: string; p_user_id: string }
             Returns: string
           }
+      get_current_user_email: { Args: never; Returns: string }
       get_group_invite_code: { Args: { p_group_id: string }; Returns: string }
       has_role: {
         Args: {
