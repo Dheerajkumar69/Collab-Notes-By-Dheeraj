@@ -78,10 +78,10 @@ export function EditRequestDialog({
         .single();
 
       if (creatorProfile) {
-        await supabase.from('notifications').insert({
-          recipient_email: creatorProfile.email,
-          message: `${profile?.full_name} requested to edit your note "${note.title}"`,
-          link: `/group/${note.group_id}`,
+        await supabase.rpc('create_notification', {
+          p_recipient_email: creatorProfile.email,
+          p_message: `${profile?.full_name} requested to edit your note "${note.title}"`,
+          p_link: `/group/${note.group_id}`,
         });
       }
 

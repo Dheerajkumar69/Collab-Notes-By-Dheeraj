@@ -42,10 +42,10 @@ export function EditRequestsPanel({ notes, onReview }: EditRequestsPanelProps) {
       if (error) throw error;
 
       // Create notification
-      await supabase.from('notifications').insert({
-        recipient_email: selectedRequest.requester_email,
-        message: `Your edit request for "${selectedNote.title}" was approved`,
-        link: `/group/${selectedNote.group_id}`,
+      await supabase.rpc('create_notification', {
+        p_recipient_email: selectedRequest.requester_email,
+        p_message: `Your edit request for "${selectedNote.title}" was approved`,
+        p_link: `/group/${selectedNote.group_id}`,
       });
 
       toast({
@@ -82,10 +82,10 @@ export function EditRequestsPanel({ notes, onReview }: EditRequestsPanelProps) {
       if (error) throw error;
 
       // Create notification
-      await supabase.from('notifications').insert({
-        recipient_email: selectedRequest.requester_email,
-        message: `Your edit request for "${selectedNote.title}" was rejected`,
-        link: `/group/${selectedNote.group_id}`,
+      await supabase.rpc('create_notification', {
+        p_recipient_email: selectedRequest.requester_email,
+        p_message: `Your edit request for "${selectedNote.title}" was rejected`,
+        p_link: `/group/${selectedNote.group_id}`,
       });
 
       toast({
