@@ -15,6 +15,7 @@ import { CreateNoteDialog } from '@/components/CreateNoteDialog';
 import { GroupSettings } from '@/components/GroupSettings';
 import { NoteCard } from '@/components/NoteCard';
 import { EditRequestsPanel } from '@/components/EditRequestsPanel';
+import { useRealtimeNotes } from '@/hooks/useRealtimeSubscription';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -73,6 +74,9 @@ export default function GroupPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Enable realtime updates for notes in this group
+  useRealtimeNotes(id);
 
   const isCreator = group?.created_by === user?.id;
 
