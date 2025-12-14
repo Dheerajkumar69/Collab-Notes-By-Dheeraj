@@ -15,6 +15,7 @@ import { CreateNoteDialog } from '@/components/CreateNoteDialog';
 import { GroupSettings } from '@/components/GroupSettings';
 import { NoteCard } from '@/components/NoteCard';
 import { EditRequestsPanel } from '@/components/EditRequestsPanel';
+import { GroupChat } from '@/components/GroupChat';
 import { useRealtimeNotes } from '@/hooks/useRealtimeSubscription';
 import {
   AlertDialog,
@@ -320,11 +321,16 @@ export default function GroupPage() {
 
         {/* Content */}
         <div className="max-w-7xl mx-auto px-4">
-          <Tabs defaultValue="notes" className="w-full">
+          <Tabs defaultValue="chat" className="w-full">
             <TabsList className="mb-6">
+              <TabsTrigger value="chat">Chat</TabsTrigger>
               <TabsTrigger value="notes">Notes</TabsTrigger>
               <TabsTrigger value="members">Members</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="chat">
+              <GroupChat groupId={id!} />
+            </TabsContent>
 
             <TabsContent value="notes">
               {isCreator && pendingEditRequests.length > 0 && (
