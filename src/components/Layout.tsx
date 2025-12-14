@@ -18,22 +18,22 @@ import { Badge } from './ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
-
-interface Notification {
-  id: string;
-  message: string;
-  link: string | null;
-  is_read: boolean;
-  created_at: string;
-}
+import { useRealtimeNotifications } from '@/hooks/useRealtimeSubscription';
+import { useNotifications, useMarkNotificationRead, useProfile } from '@/hooks/supabase-hooks';
 
 export const Layout = ({ children }: { children: ReactNode }) => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
+
+  // Use react-query hooks for data
+  const { data: notifications = [] } = useNotifications();
+  const { data: userProfile } = useProfile();
+  const markAsReadMutation = useMarkNotificationRead();
+
+  // Enable realtime updates for notifications
+  useRealtimeNotifications();
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
@@ -47,41 +47,9 @@ export const Layout = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (user) {
-      fetchNotifications();
       checkAdminStatus();
-      fetchUserProfile();
     }
   }, [user]);
-
-  const fetchUserProfile = async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-    setUserProfile(data);
-  };
-
-  const fetchNotifications = async () => {
-    if (!user) return;
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('id', user.id)
-      .single();
-
-    if (profile) {
-      const { data } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('recipient_email', profile.email)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (data) setNotifications(data);
-    }
-  };
 
   const checkAdminStatus = async () => {
     if (!user) return;
@@ -107,19 +75,11 @@ export const Layout = ({ children }: { children: ReactNode }) => {
   };
 
   const markAsRead = async (notificationId: string, link: string | null) => {
-    await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', notificationId);
-
-    setNotifications(prev =>
-      prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
-    );
-
+    markAsReadMutation.mutate(notificationId);
     if (link) navigate(link);
   };
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadCount = notifications.filter((n: any) => !n.is_read).length;
 
   const NavLinks = () => (
     <>
@@ -184,7 +144,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
                     No notifications
                   </div>
                 ) : (
-                  notifications.map(notification => (
+                  notifications.map((notification: any) => (
                     <DropdownMenuItem
                       key={notification.id}
                       className={`p-3 cursor-pointer ${!notification.is_read ? 'bg-muted/50' : ''}`}
@@ -206,7 +166,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon">
                   <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center text-white font-semibold">
-                    {userProfile?.full_name?.[0] || user?.email?.[0].toUpperCase()}
+                    {userProfile?.full_name?.[0] || user?.email?.[0]?.toUpperCase() || 'U'}
                   </div>
                 </Button>
               </DropdownMenuTrigger>

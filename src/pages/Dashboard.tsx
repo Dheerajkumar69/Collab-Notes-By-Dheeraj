@@ -8,6 +8,7 @@ import { Plus, Search, Users, FileText, TrendingUp, Folder } from 'lucide-react'
 import { CreateGroupDialog } from '@/components/CreateGroupDialog';
 import { JoinGroupDialog } from '@/components/JoinGroupDialog';
 import { useGroups, useProfile, useStats } from '@/hooks/supabase-hooks';
+import { useRealtimeGroups } from '@/hooks/useRealtimeSubscription';
 
 interface Group {
   id: string;
@@ -24,6 +25,9 @@ export default function Dashboard() {
   const { data: groups = [], isLoading: groupsLoading } = useGroups();
   const { data: userProfile, isLoading: profileLoading } = useProfile();
   const { data: stats = { groups: 0, notes: 0 }, isLoading: statsLoading } = useStats();
+  
+  // Enable realtime updates for groups
+  useRealtimeGroups();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('newest');
