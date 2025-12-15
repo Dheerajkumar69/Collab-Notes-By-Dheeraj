@@ -75,7 +75,11 @@ export default function Landing() {
                   <ArrowRight size={18} />
                 </Button>
               </Link>
-              <Button size="lg" variant="outline">
+              <Button 
+                size="lg" 
+                variant="outline"
+                onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+              >
                 Learn More
               </Button>
             </div>
@@ -84,7 +88,7 @@ export default function Landing() {
       </section>
 
       {/* Features Grid */}
-      <section className="py-24 bg-muted/30">
+      <section id="features" className="py-24 bg-muted/30">
         <div className="container">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Everything you need to collaborate</h2>

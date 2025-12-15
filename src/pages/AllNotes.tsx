@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Layout } from '@/components/Layout';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -14,81 +12,63 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, FileText, Image as ImageIcon, File, ExternalLink, X } from 'lucide-react';
+import { Search, FileText, Image as ImageIcon, File, ExternalLink, X, Loader2 } from 'lucide-react';
 import { format, isToday, isThisWeek, isThisMonth } from 'date-fns';
+import { useGroups } from '@/hooks/supabase-hooks';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { ErrorState } from '@/components/ErrorState';
+import type { Tables } from '@/integrations/supabase/types';
 
-interface Note {
-  id: string;
-  title: string;
-  content?: string | null;
-  group_id: string;
-  labels?: string[];
-  author_name?: string | null;
-  attachments?: any;
-  color?: string | null;
-  created_at: string;
-}
+type Note = Tables<'notes'>;
+type Group = Tables<'groups'>;
 
-interface Group {
-  id: string;
-  name: string;
-  color?: string;
-}
+const NOTES_PER_PAGE = 12;
 
 export default function AllNotes() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
   const [selectedLabel, setSelectedLabel] = useState('all');
   const [selectedTimeframe, setSelectedTimeframe] = useState('all');
-  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
-  useEffect(() => {
-    fetchData();
-  }, [user]);
+  // Use the shared groups hook
+  const { data: groups = [], isLoading: groupsLoading, isError: groupsError, refetch: refetchGroups } = useGroups();
 
-  const fetchData = async () => {
-    try {
-      // Fetch groups
-      const { data: groupsData } = await supabase
-        .from('groups')
+  // Fetch notes for all user groups
+  const { data: notes = [], isLoading: notesLoading, isError: notesError, refetch: refetchNotes } = useQuery({
+    queryKey: ['all-notes', groups],
+    queryFn: async () => {
+      const groupIds = (groups as Group[]).map(g => g.id);
+      if (groupIds.length === 0) return [];
+      
+      const { data, error } = await supabase
+        .from('notes')
         .select('*')
-        .or(`created_by.eq.${user?.id},members.cs.{${user?.email}}`);
+        .in('group_id', groupIds)
+        .order('created_at', { ascending: false });
 
-      setGroups(groupsData || []);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: (groups as Group[]).length > 0,
+  });
 
-      // Fetch all notes from user's groups
-      const groupIds = groupsData?.map(g => g.id) || [];
-      if (groupIds.length > 0) {
-        const { data: notesData } = await supabase
-          .from('notes')
-          .select('*')
-          .in('group_id', groupIds)
-          .order('created_at', { ascending: false });
-
-        setNotes(notesData || []);
-      }
-    } catch (error: any) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const isLoading = groupsLoading || notesLoading;
+  const isError = groupsError || notesError;
 
   const allLabels = Array.from(
-    new Set(notes.flatMap(note => note.labels || []))
+    new Set((notes as Note[]).flatMap(note => note.labels || []))
   );
 
-  const filteredNotes = notes.filter(note => {
+  const filteredNotes = (notes as Note[]).filter(note => {
     // Search filter
     const matchesSearch =
       note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       note.content?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      groups
+      (groups as Group[])
         .find(g => g.id === note.group_id)
         ?.name.toLowerCase()
         .includes(searchTerm.toLowerCase());
@@ -100,12 +80,9 @@ export default function AllNotes() {
     // Type filter
     let matchesType = true;
     if (selectedType !== 'all') {
-      const hasImage = note.attachments?.some((a: any) =>
-        a.type?.startsWith('image/')
-      );
-      const hasFile = note.attachments?.some(
-        (a: any) => !a.type?.startsWith('image/')
-      );
+      const attachments = note.attachments as Array<{ type?: string }> | null;
+      const hasImage = attachments?.some(a => a.type?.startsWith('image/'));
+      const hasFile = attachments?.some(a => !a.type?.startsWith('image/'));
       if (selectedType === 'image') matchesType = hasImage || false;
       else if (selectedType === 'file') matchesType = hasFile || false;
       else matchesType = !hasImage && !hasFile;
@@ -117,7 +94,7 @@ export default function AllNotes() {
 
     // Timeframe filter
     let matchesTimeframe = true;
-    if (selectedTimeframe !== 'all') {
+    if (selectedTimeframe !== 'all' && note.created_at) {
       const noteDate = new Date(note.created_at);
       if (selectedTimeframe === 'today') matchesTimeframe = isToday(noteDate);
       else if (selectedTimeframe === 'week')
@@ -135,7 +112,7 @@ export default function AllNotes() {
     );
   });
 
-  const getColorClass = (color?: string) => {
+  const getColorClass = (color?: string | null) => {
     switch (color) {
       case 'blue': return 'from-blue-500 to-blue-600';
       case 'green': return 'from-green-500 to-green-600';
@@ -148,11 +125,10 @@ export default function AllNotes() {
   };
 
   const getNoteTypeIcon = (note: Note) => {
-    const hasImage = note.attachments?.some((a: any) =>
-      a.type?.startsWith('image/')
-    );
+    const attachments = note.attachments as Array<{ type?: string }> | null;
+    const hasImage = attachments?.some(a => a.type?.startsWith('image/'));
     if (hasImage) return <ImageIcon className="h-4 w-4" />;
-    const hasFile = note.attachments?.some(a => a);
+    const hasFile = attachments?.some(a => a);
     if (hasFile) return <File className="h-4 w-4" />;
     return <FileText className="h-4 w-4" />;
   };
@@ -168,7 +144,34 @@ export default function AllNotes() {
     setSelectedType('all');
     setSelectedLabel('all');
     setSelectedTimeframe('all');
+    setPage(1);
   };
+
+  // Pagination
+  const totalPages = Math.ceil(filteredNotes.length / NOTES_PER_PAGE);
+  const paginatedNotes = filteredNotes.slice(
+    (page - 1) * NOTES_PER_PAGE,
+    page * NOTES_PER_PAGE
+  );
+
+  const handleRetry = () => {
+    refetchGroups();
+    refetchNotes();
+  };
+
+  if (isError) {
+    return (
+      <Layout>
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <ErrorState 
+            title="Failed to load notes"
+            message="We couldn't load your notes. Please check your connection and try again."
+            onRetry={handleRetry}
+          />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -197,13 +200,13 @@ export default function AllNotes() {
 
         {/* Filters */}
         <div className="mb-6 flex flex-wrap gap-3">
-          <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+          <Select value={selectedGroup} onValueChange={(v) => { setSelectedGroup(v); setPage(1); }}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="All Groups" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Groups</SelectItem>
-              {groups.map(group => (
+              {(groups as Group[]).map(group => (
                 <SelectItem key={group.id} value={group.id}>
                   {group.name}
                 </SelectItem>
@@ -211,7 +214,7 @@ export default function AllNotes() {
             </SelectContent>
           </Select>
 
-          <Select value={selectedType} onValueChange={setSelectedType}>
+          <Select value={selectedType} onValueChange={(v) => { setSelectedType(v); setPage(1); }}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="All Types" />
             </SelectTrigger>
@@ -224,7 +227,7 @@ export default function AllNotes() {
           </Select>
 
           {allLabels.length > 0 && (
-            <Select value={selectedLabel} onValueChange={setSelectedLabel}>
+            <Select value={selectedLabel} onValueChange={(v) => { setSelectedLabel(v); setPage(1); }}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="All Labels" />
               </SelectTrigger>
@@ -239,7 +242,7 @@ export default function AllNotes() {
             </Select>
           )}
 
-          <Select value={selectedTimeframe} onValueChange={setSelectedTimeframe}>
+          <Select value={selectedTimeframe} onValueChange={(v) => { setSelectedTimeframe(v); setPage(1); }}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="All Time" />
             </SelectTrigger>
@@ -260,12 +263,15 @@ export default function AllNotes() {
         </div>
 
         {/* Notes Grid */}
-        {loading ? (
-          <div className="text-center py-12 text-muted-foreground">Loading...</div>
-        ) : filteredNotes.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredNotes.map(note => {
-              const group = groups.find(g => g.id === note.group_id);
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : paginatedNotes.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {paginatedNotes.map(note => {
+                const group = (groups as Group[]).find(g => g.id === note.group_id);
               return (
                 <Card
                   key={note.id}
@@ -310,7 +316,7 @@ export default function AllNotes() {
 
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{note.author_name}</span>
-                    <span>{format(new Date(note.created_at), 'MMM d, yyyy')}</span>
+                    <span>{note.created_at ? format(new Date(note.created_at), 'MMM d, yyyy') : ''}</span>
                   </div>
 
                   <Button
@@ -328,7 +334,33 @@ export default function AllNotes() {
                 </Card>
               );
             })}
-          </div>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-8">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {page} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
         ) : (
           <Card className="p-12 text-center">
             <p className="text-muted-foreground mb-4">

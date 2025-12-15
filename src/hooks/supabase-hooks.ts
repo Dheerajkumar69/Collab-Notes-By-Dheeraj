@@ -151,11 +151,16 @@ export const useMarkNotificationRead = () => {
 };
 
 // Stats hooks
+export interface Stats {
+  groups: number;
+  notes: number;
+  thisWeek: number;
+}
+
 export const useStats = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
 
-  return useQuery({
+  return useQuery<Stats>({
     queryKey: ['stats', user?.id],
     queryFn: async () => {
       if (!user) throw new Error('User not authenticated');
@@ -187,9 +192,22 @@ export const useStats = () => {
 
       if (notesError) throw notesError;
 
+      // Get notes from this week
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      
+      const { count: thisWeekCount, error: thisWeekError } = await supabase
+        .from('notes')
+        .select('*', { count: 'exact', head: true })
+        .in('group_id', groupIds)
+        .gte('created_at', oneWeekAgo.toISOString());
+
+      if (thisWeekError) throw thisWeekError;
+
       return {
         groups: userGroups.length,
         notes: notesCount || 0,
+        thisWeek: thisWeekCount || 0,
       };
     },
     enabled: !!user,

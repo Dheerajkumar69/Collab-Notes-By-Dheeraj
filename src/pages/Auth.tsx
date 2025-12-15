@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,10 +15,13 @@ import { supabase } from '@/integrations/supabase/client';
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { signIn, signUp, user } = useAuth();
+  const location = useLocation();
+  const { signIn, signUp, user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
+
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
 
   const { register: registerSignIn, handleSubmit: handleSignInSubmit, formState: { errors: signInErrors } } = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),
@@ -33,10 +36,22 @@ export default function Auth() {
   });
 
   useEffect(() => {
-    if (user) {
-      navigate('/dashboard');
+    if (!authLoading && user) {
+      navigate(from, { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, authLoading, navigate, from]);
+
+  // Show loading while checking auth state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-hero">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleSignIn = async (data: SignInFormData) => {
     setIsLoading(true);
@@ -54,7 +69,7 @@ export default function Auth() {
         title: 'Success',
         description: 'Signed in successfully',
       });
-      navigate('/dashboard');
+      navigate(from, { replace: true });
     }
 
     setIsLoading(false);
@@ -76,7 +91,7 @@ export default function Auth() {
         title: 'Success',
         description: 'Account created successfully',
       });
-      navigate('/dashboard');
+      navigate(from, { replace: true });
     }
 
     setIsLoading(false);
