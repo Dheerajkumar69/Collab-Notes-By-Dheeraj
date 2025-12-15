@@ -9,22 +9,15 @@ import { CreateGroupDialog } from '@/components/CreateGroupDialog';
 import { JoinGroupDialog } from '@/components/JoinGroupDialog';
 import { useGroups, useProfile, useStats } from '@/hooks/supabase-hooks';
 import { useRealtimeGroups } from '@/hooks/useRealtimeSubscription';
+import { ErrorState } from '@/components/ErrorState';
+import type { Tables } from '@/integrations/supabase/types';
 
-interface Group {
-  id: string;
-  name: string;
-  description: string | null;
-  color: string;
-  members: string[];
-  background_image_url: string | null;
-  created_by: string;
-  created_at: string;
-}
+type Group = Tables<'groups'>;
 
 export default function Dashboard() {
-  const { data: groups = [], isLoading: groupsLoading } = useGroups();
-  const { data: userProfile, isLoading: profileLoading } = useProfile();
-  const { data: stats = { groups: 0, notes: 0 }, isLoading: statsLoading } = useStats();
+  const { data: groups = [], isLoading: groupsLoading, isError: groupsError, refetch: refetchGroups } = useGroups();
+  const { data: userProfile, isLoading: profileLoading, isError: profileError, refetch: refetchProfile } = useProfile();
+  const { data: stats = { groups: 0, notes: 0, thisWeek: 0 }, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useStats();
   
   // Enable realtime updates for groups
   useRealtimeGroups();
@@ -46,15 +39,21 @@ export default function Dashboard() {
     return colorMap[color] || colorMap.blue;
   };
 
-  const filteredGroups = (groups as any[])
+  const filteredGroups = (groups as Group[])
     .filter(g => g.name.toLowerCase().includes(searchTerm.toLowerCase()))
     .sort((a, b) => {
-      if (sortBy === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      if (sortBy === 'oldest') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      if (sortBy === 'newest') return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      if (sortBy === 'oldest') return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
       if (sortBy === 'name-asc') return a.name.localeCompare(b.name);
       if (sortBy === 'name-desc') return b.name.localeCompare(a.name);
       return 0;
     });
+
+  const handleRetry = () => {
+    refetchGroups();
+    refetchProfile();
+    refetchStats();
+  };
 
   if (groupsLoading || profileLoading || statsLoading) {
     return (
@@ -68,13 +67,27 @@ export default function Dashboard() {
     );
   }
 
+  if (groupsError || profileError || statsError) {
+    return (
+      <Layout>
+        <div className="container py-8">
+          <ErrorState 
+            title="Failed to load dashboard"
+            message="We couldn't load your data. Please check your connection and try again."
+            onRetry={handleRetry}
+          />
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="container py-8">
         {/* Welcome Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">
-            Welcome back, {(userProfile as any)?.full_name?.split(' ')[0] || 'there'}!
+        <h1 className="text-4xl font-bold mb-2">
+            Welcome back, {userProfile?.full_name?.split(' ')[0] || 'there'}!
           </h1>
           <p className="text-muted-foreground text-lg">Manage your collaborative workspaces</p>
           <div className="flex gap-3 mt-4">
@@ -98,7 +111,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Your Groups</p>
-                  <p className="text-2xl font-bold">{(stats as any).groups}</p>
+                  <p className="text-2xl font-bold">{stats.groups}</p>
                 </div>
               </div>
             </CardContent>
@@ -112,7 +125,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Recent Notes</p>
-                  <p className="text-2xl font-bold">{(stats as any).notes}</p>
+                  <p className="text-2xl font-bold">{stats.notes}</p>
                 </div>
               </div>
             </CardContent>
@@ -126,7 +139,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">This Week</p>
-                  <p className="text-2xl font-bold">{(stats as any).thisWeek || 0}</p>
+                  <p className="text-2xl font-bold">{stats.thisWeek || 0}</p>
                 </div>
               </div>
             </CardContent>
@@ -195,7 +208,7 @@ export default function Dashboard() {
                       </div>
                       <div className="flex items-center gap-1">
                         <Users size={14} />
-                        <span>{group.members?.length || 0} members</span>
+                        <span>{(group.members?.length || 0) + 1} members</span>
                       </div>
                     </div>
                   </CardContent>

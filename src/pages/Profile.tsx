@@ -25,13 +25,12 @@ export default function Profile() {
   });
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
+    // Profile page is now protected by ProtectedRoute, 
+    // so we don't need to check for user here
+    if (user) {
+      fetchProfile();
     }
-
-    fetchProfile();
-  }, [user, navigate]);
+  }, [user]);
 
   const fetchProfile = async () => {
     if (!user) return;
@@ -153,6 +152,9 @@ export default function Profile() {
                 {errors.email && (
                   <p className="text-sm text-red-500 mt-1">{errors.email.message}</p>
                 )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Changing your email will require verification via the new email address.
+                </p>
               </div>
 
               <div className="flex gap-4 pt-4">
