@@ -17,6 +17,8 @@ import { NoteCard } from '@/components/NoteCard';
 import { EditRequestsPanel } from '@/components/EditRequestsPanel';
 import { GroupChat } from '@/components/GroupChat';
 import { useRealtimeNotes } from '@/hooks/useRealtimeSubscription';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,6 +67,7 @@ export default function GroupPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [group, setGroup] = useState<Group | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [members, setMembers] = useState<Profile[]>([]);
@@ -75,6 +78,7 @@ export default function GroupPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'split' | 'members'>('split');
 
   // Enable realtime updates for notes in this group
   useRealtimeNotes(id);
@@ -232,6 +236,89 @@ export default function GroupPage() {
     note.edit_requests?.some((req: any) => req.status === 'pending')
   );
 
+  const renderNotesPanel = () => (
+    <>
+      {isCreator && pendingEditRequests.length > 0 && (
+        <EditRequestsPanel
+          notes={pendingEditRequests}
+          onReview={fetchNotes}
+        />
+      )}
+
+      {/* Search & Filter */}
+      <div className="mb-6 space-y-4">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search notes..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Button
+            onClick={() => setShowCreateNote(true)}
+            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Note
+          </Button>
+        </div>
+
+        {allLabels.length > 0 && (
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant={selectedLabel === 'All' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedLabel('All')}
+            >
+              All
+            </Button>
+            {allLabels.map(label => (
+              <Button
+                key={label}
+                variant={selectedLabel === label ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedLabel(label)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Notes Grid */}
+      {filteredNotes.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          {filteredNotes.map(note => (
+            <NoteCard
+              key={note.id}
+              note={note}
+              onUpdate={fetchNotes}
+              onEdit={() => {
+                setEditingNote(note);
+                setShowCreateNote(true);
+              }}
+              isCreator={isCreator}
+            />
+          ))}
+        </div>
+      ) : (
+        <Card className="p-12 text-center">
+          <p className="text-muted-foreground mb-4">No notes yet</p>
+          <Button
+            onClick={() => setShowCreateNote(true)}
+            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+          >
+            Create Your First Note
+          </Button>
+        </Card>
+      )}
+    </>
+  );
+
   if (loading) {
     return (
       <Layout>
@@ -321,95 +408,38 @@ export default function GroupPage() {
 
         {/* Content */}
         <div className="max-w-7xl mx-auto px-4">
-          <Tabs defaultValue="chat" className="w-full">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'split' | 'members')} className="w-full">
             <TabsList className="mb-6">
-              <TabsTrigger value="chat">Chat</TabsTrigger>
-              <TabsTrigger value="notes">Notes</TabsTrigger>
+              <TabsTrigger value="split">Chat & Notes</TabsTrigger>
               <TabsTrigger value="members">Members</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="chat">
-              <GroupChat groupId={id!} />
-            </TabsContent>
-
-            <TabsContent value="notes">
-              {isCreator && pendingEditRequests.length > 0 && (
-                <EditRequestsPanel
-                  notes={pendingEditRequests}
-                  onReview={fetchNotes}
-                />
-              )}
-
-              {/* Search & Filter */}
-              <div className="mb-6 space-y-4">
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search notes..."
-                      value={searchTerm}
-                      onChange={e => setSearchTerm(e.target.value)}
-                      className="pl-9"
-                    />
+            <TabsContent value="split" className="mt-0">
+              {isMobile ? (
+                // Mobile: Stack vertically
+                <div className="flex flex-col gap-4">
+                  <div className="h-[400px]">
+                    <GroupChat groupId={id!} />
                   </div>
-                  <Button
-                    onClick={() => setShowCreateNote(true)}
-                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Note
-                  </Button>
-                </div>
-
-                {allLabels.length > 0 && (
-                  <div className="flex gap-2 flex-wrap">
-                    <Button
-                      variant={selectedLabel === 'All' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setSelectedLabel('All')}
-                    >
-                      All
-                    </Button>
-                    {allLabels.map(label => (
-                      <Button
-                        key={label}
-                        variant={selectedLabel === label ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setSelectedLabel(label)}
-                      >
-                        {label}
-                      </Button>
-                    ))}
+                  <div>
+                    {renderNotesPanel()}
                   </div>
-                )}
-              </div>
-
-              {/* Notes Grid */}
-              {filteredNotes.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-                  {filteredNotes.map(note => (
-                    <NoteCard
-                      key={note.id}
-                      note={note}
-                      onUpdate={fetchNotes}
-                      onEdit={() => {
-                        setEditingNote(note);
-                        setShowCreateNote(true);
-                      }}
-                      isCreator={isCreator}
-                    />
-                  ))}
                 </div>
               ) : (
-                <Card className="p-12 text-center">
-                  <p className="text-muted-foreground mb-4">No notes yet</p>
-                  <Button
-                    onClick={() => setShowCreateNote(true)}
-                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
-                  >
-                    Create Your First Note
-                  </Button>
-                </Card>
+                // Desktop: Side by side with resizable panels
+                <ResizablePanelGroup direction="horizontal" className="min-h-[600px] rounded-lg border">
+                  <ResizablePanel defaultSize={40} minSize={25}>
+                    <div className="h-full">
+                      <GroupChat groupId={id!} />
+                    </div>
+                  </ResizablePanel>
+                  <ResizableHandle withHandle />
+                  <ResizablePanel defaultSize={60} minSize={30}>
+                    <div className="h-full overflow-auto p-4">
+                      {renderNotesPanel()}
+                    </div>
+                  </ResizablePanel>
+                </ResizablePanelGroup>
               )}
             </TabsContent>
 
