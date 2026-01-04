@@ -111,8 +111,8 @@ All colors MUST be HSL.
     --destructive: 0 63% 31%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 4% 16%;
-    --input: 240 4% 16%;
+    --border: 240 4% 20% / 0.3;
+    --input: 240 4% 20% / 0.3;
     --ring: 243 75% 59%;
     
     /* Note colors dark mode */
