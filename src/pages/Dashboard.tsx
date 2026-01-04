@@ -26,6 +26,8 @@ export default function Dashboard() {
   const [sortBy, setSortBy] = useState('newest');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const GROUPS_PER_PAGE = 9;
 
   const getColorClass = (color: string) => {
     const colorMap: Record<string, string> = {
@@ -48,6 +50,19 @@ export default function Dashboard() {
       if (sortBy === 'name-desc') return b.name.localeCompare(a.name);
       return 0;
     });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredGroups.length / GROUPS_PER_PAGE);
+  const paginatedGroups = filteredGroups.slice(
+    (currentPage - 1) * GROUPS_PER_PAGE,
+    currentPage * GROUPS_PER_PAGE
+  );
+
+  // Reset page when search changes
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1);
+  };
 
   const handleRetry = () => {
     refetchGroups();
@@ -153,7 +168,7 @@ export default function Dashboard() {
             <Input
               placeholder="Search groups..."
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={e => handleSearchChange(e.target.value)}
               className="pl-10"
             />
           </div>
@@ -182,40 +197,65 @@ export default function Dashboard() {
             </Button>
           </Card>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredGroups.map(group => (
-              <Link key={group.id} to={`/group/${group.id}`}>
-                <Card className="h-full hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden">
-                  <div
-                    className={`h-32 bg-gradient-to-br ${getColorClass(group.color)} flex items-center justify-center relative`}
-                    style={
-                      group.background_image_url
-                        ? { backgroundImage: `url(${group.background_image_url})`, backgroundSize: 'cover' }
-                        : {}
-                    }
-                  >
-                    <Folder className="text-white" size={48} />
-                  </div>
-                  <CardContent className="p-6">
-                    <h3 className="text-xl font-bold mb-2">{group.name}</h3>
-                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                      {group.description || 'No description'}
-                    </p>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <FileText size={14} />
-                        <span>Notes</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Users size={14} />
-                        <span>{(group.members?.length || 0) + 1} members</span>
-                      </div>
+          <>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {paginatedGroups.map(group => (
+                <Link key={group.id} to={`/group/${group.id}`}>
+                  <Card className="h-full hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden">
+                    <div
+                      className={`h-32 bg-gradient-to-br ${getColorClass(group.color)} flex items-center justify-center relative`}
+                      style={
+                        group.background_image_url
+                          ? { backgroundImage: `url(${group.background_image_url})`, backgroundSize: 'cover' }
+                          : {}
+                      }
+                    >
+                      <Folder className="text-white" size={48} />
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
+                    <CardContent className="p-6">
+                      <h3 className="text-xl font-bold mb-2">{group.name}</h3>
+                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                        {group.description || 'No description'}
+                      </p>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <FileText size={14} />
+                          <span>Notes</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Users size={14} />
+                          <span>{(group.members?.length || 0) + 1} members</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center gap-4 mt-8">
+                <Button
+                  variant="outline"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => prev - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

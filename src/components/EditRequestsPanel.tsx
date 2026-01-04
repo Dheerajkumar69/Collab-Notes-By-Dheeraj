@@ -12,15 +12,16 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Info, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import type { Note, EditRequest } from '@/types';
 
 interface EditRequestsPanelProps {
-  notes: any[];
+  notes: Note[];
   onReview: () => void;
 }
 
 export function EditRequestsPanel({ notes, onReview }: EditRequestsPanelProps) {
-  const [selectedNote, setSelectedNote] = useState<any>(null);
-  const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<EditRequest | null>(null);
 
   const handleApprove = async () => {
     if (!selectedNote || !selectedRequest) return;

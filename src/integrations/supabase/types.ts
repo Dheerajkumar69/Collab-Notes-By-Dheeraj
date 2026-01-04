@@ -52,31 +52,37 @@ export type Database = {
       }
       messages: {
         Row: {
+          attachments: Json | null
           created_at: string
           group_id: string
           id: string
           is_edited: boolean | null
           message: string
+          reactions: Json | null
           reply_to: string | null
           user_id: string
           user_name: string
         }
         Insert: {
+          attachments?: Json | null
           created_at?: string
           group_id: string
           id?: string
           is_edited?: boolean | null
           message: string
+          reactions?: Json | null
           reply_to?: string | null
           user_id: string
           user_name: string
         }
         Update: {
+          attachments?: Json | null
           created_at?: string
           group_id?: string
           id?: string
           is_edited?: boolean | null
           message?: string
+          reactions?: Json | null
           reply_to?: string | null
           user_id?: string
           user_name?: string
@@ -208,6 +214,38 @@ export type Database = {
         }
         Relationships: []
       }
+      typing_indicators: {
+        Row: {
+          group_id: string
+          id: string
+          updated_at: string
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          user_name: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "typing_indicators_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -231,6 +269,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_typing_indicators: { Args: never; Returns: undefined }
       create_notification:
         | {
             Args: {
