@@ -12,11 +12,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
+import type { Note } from '@/types';
 
 interface EditRequestDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  note: any;
+  note: Note;
   onSuccess: () => void;
 }
 
@@ -65,7 +66,7 @@ export function EditRequestDialog({
 
       const { error } = await supabase
         .from('notes')
-        .update({ edit_requests: [...editRequests, newRequest] })
+        .update({ edit_requests: JSON.parse(JSON.stringify([...editRequests, newRequest])) })
         .eq('id', note.id);
 
       if (error) throw error;

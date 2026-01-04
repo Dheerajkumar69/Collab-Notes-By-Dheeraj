@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Send, Reply, X, MoreVertical, Pencil, Trash2, Check } from 'lucide-react';
-import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
+import { format, isToday, isYesterday } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import {
   DropdownMenu,
@@ -14,6 +14,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { TypingIndicator, useTypingIndicator } from './TypingIndicator';
+import { MessageReactions } from './MessageReactions';
+import { ChatFileUpload, ChatAttachmentPreview } from './ChatFileUpload';
+import type { Json } from '@/integrations/supabase/types';
+
+interface ChatAttachment {
+  url: string;
+  name: string;
+  type: string;
+  size: number;
+}
+
+interface Reaction {
+  emoji: string;
+  user_id: string;
+  user_name: string;
+}
 
 interface Message {
   id: string;
@@ -23,6 +40,8 @@ interface Message {
   created_at: string;
   is_edited: boolean;
   reply_to: string | null;
+  reactions?: Reaction[];
+  attachments?: ChatAttachment[];
 }
 
 interface GroupChatProps {
@@ -38,11 +57,16 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
   const [editText, setEditText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<ChatAttachment[]>([]);
+  const [userName, setUserName] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  const { startTyping, stopTyping } = useTypingIndicator(groupId);
 
   useEffect(() => {
     fetchMessages();
+    fetchUserName();
     
     // Subscribe to realtime messages
     const channel = supabase
@@ -57,10 +81,21 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setMessages(prev => [...prev, payload.new as Message]);
+            const newMsg = payload.new as Message;
+            // Parse reactions and attachments from JSON
+            setMessages(prev => [...prev, {
+              ...newMsg,
+              reactions: (newMsg.reactions as unknown as Reaction[]) || [],
+              attachments: (newMsg.attachments as unknown as ChatAttachment[]) || [],
+            }]);
           } else if (payload.eventType === 'UPDATE') {
+            const updatedMsg = payload.new as Message;
             setMessages(prev => 
-              prev.map(m => m.id === payload.new.id ? payload.new as Message : m)
+              prev.map(m => m.id === updatedMsg.id ? {
+                ...updatedMsg,
+                reactions: (updatedMsg.reactions as unknown as Reaction[]) || [],
+                attachments: (updatedMsg.attachments as unknown as ChatAttachment[]) || [],
+              } : m)
             );
           } else if (payload.eventType === 'DELETE') {
             setMessages(prev => prev.filter(m => m.id !== payload.old.id));
@@ -71,6 +106,7 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
 
     return () => {
       supabase.removeChannel(channel);
+      stopTyping();
     };
   }, [groupId]);
 
@@ -81,6 +117,16 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
     }
   }, [messages]);
 
+  const fetchUserName = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single();
+    setUserName(data?.full_name || 'Unknown');
+  };
+
   const fetchMessages = async () => {
     try {
       const { data, error } = await supabase
@@ -90,7 +136,11 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      setMessages((data || []).map(m => ({
+        ...m,
+        reactions: (m.reactions as unknown as Reaction[]) || [],
+        attachments: (m.attachments as unknown as ChatAttachment[]) || [],
+      })));
     } catch (error) {
       console.error('Error fetching messages:', error);
     } finally {
@@ -98,30 +148,35 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
     }
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewMessage(e.target.value);
+    if (e.target.value && userName) {
+      startTyping(userName);
+    }
+  };
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user || sending) return;
+    if ((!newMessage.trim() && pendingFiles.length === 0) || !user || sending) return;
 
     setSending(true);
+    stopTyping();
+    
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user.id)
-        .single();
-
       const { error } = await supabase.from('messages').insert({
         group_id: groupId,
         user_id: user.id,
-        user_name: profile?.full_name || 'Unknown',
-        message: newMessage.trim(),
+        user_name: userName,
+        message: newMessage.trim() || (pendingFiles.length > 0 ? '📎 Attachment' : ''),
         reply_to: replyingTo?.id || null,
+        attachments: pendingFiles as unknown as Json,
       });
 
       if (error) throw error;
       setNewMessage('');
       setReplyingTo(null);
-    } catch (error: any) {
+      setPendingFiles([]);
+    } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to send message',
@@ -291,6 +346,14 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
                                   {msg.user_name}
                                 </p>
                               )}
+
+                              {/* Attachments */}
+                              {msg.attachments && msg.attachments.length > 0 && (
+                                <ChatAttachmentPreview 
+                                  attachments={msg.attachments} 
+                                  isOwnMessage={isOwnMessage}
+                                />
+                              )}
                               
                               {editingMessage?.id === msg.id ? (
                                 <div className="flex gap-2">
@@ -317,6 +380,18 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
                                 <span>{formatMessageTime(msg.created_at)}</span>
                                 {msg.is_edited && <span>• edited</span>}
                               </div>
+
+                              {/* Reactions */}
+                              {msg.reactions && (
+                                <div className="mt-1">
+                                  <MessageReactions
+                                    messageId={msg.id}
+                                    reactions={msg.reactions}
+                                    currentUserId={user?.id || ''}
+                                    isOwnMessage={isOwnMessage}
+                                  />
+                                </div>
+                              )}
                             </div>
                             
                             {/* Message Actions */}
@@ -370,6 +445,9 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
         )}
       </ScrollArea>
 
+      {/* Typing Indicator */}
+      <TypingIndicator groupId={groupId} />
+
       {/* Reply Preview */}
       {replyingTo && (
         <div className="px-4 py-2 bg-muted/50 border-t flex items-center gap-2">
@@ -386,19 +464,27 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
 
       {/* Input Area */}
       <form onSubmit={sendMessage} className="p-3 border-t bg-background">
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-end">
+          <ChatFileUpload
+            groupId={groupId}
+            onFilesSelected={(files) => setPendingFiles(prev => [...prev, ...files])}
+            pendingFiles={pendingFiles}
+            onRemoveFile={(index) => setPendingFiles(prev => prev.filter((_, i) => i !== index))}
+            disabled={sending}
+          />
           <Input
             ref={inputRef}
             placeholder="Type a message..."
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
+            onChange={handleInputChange}
+            onBlur={stopTyping}
             className="flex-1"
             disabled={sending}
           />
           <Button 
             type="submit" 
             size="icon" 
-            disabled={!newMessage.trim() || sending}
+            disabled={(!newMessage.trim() && pendingFiles.length === 0) || sending}
             className="bg-primary hover:bg-primary/90"
           >
             <Send className="h-4 w-4" />

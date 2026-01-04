@@ -10,18 +10,19 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
+import type { Note, Attachment } from '@/types';
 
 interface NoteViewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  note: any;
+  note: Note;
 }
 
 export function NoteViewDialog({ open, onOpenChange, note }: NoteViewDialogProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  const images = note.attachments?.filter((a: any) => a.type?.startsWith('image/')) || [];
-  const files = note.attachments?.filter((a: any) => !a.type?.startsWith('image/')) || [];
+  const images = note.attachments?.filter((a) => a.type?.startsWith('image/')) || [];
+  const files = note.attachments?.filter((a) => !a.type?.startsWith('image/')) || [];
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -96,7 +97,7 @@ export function NoteViewDialog({ open, onOpenChange, note }: NoteViewDialogProps
             <div>
               <h3 className="font-semibold mb-2">Attachments</h3>
               <div className="space-y-2">
-                {files.map((file: any, index: number) => (
+                {files.map((file, index) => (
                   <div
                     key={index}
                     className="flex items-center justify-between p-3 bg-muted rounded-lg"

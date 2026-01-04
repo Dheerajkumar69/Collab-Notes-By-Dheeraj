@@ -80,7 +80,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
     if (link) navigate(link);
   };
 
-  const unreadCount = notifications.filter((n: any) => !n.is_read).length;
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const NavLinks = () => (
     <>
@@ -144,7 +144,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
                     No notifications
                   </div>
                 ) : (
-                  notifications.map((notification: any) => (
+                  notifications.map((notification) => (
                     <DropdownMenuItem
                       key={notification.id}
                       className={`p-3 cursor-pointer ${!notification.is_read ? 'bg-muted/50' : ''}`}

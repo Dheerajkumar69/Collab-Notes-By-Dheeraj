@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,21 +30,52 @@ import { toast } from '@/hooks/use-toast';
 import { NoteViewDialog } from './NoteViewDialog';
 import { EditRequestDialog } from './EditRequestDialog';
 import ReactMarkdown from 'react-markdown';
+import { useDeleteNoteWithCleanup } from '@/hooks/useDeleteNoteWithCleanup';
+import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '🔥', '👏', '✅', '💯'];
 
+interface Attachment {
+  url: string;
+  name: string;
+  type: string;
+}
+
+interface Reaction {
+  emoji: string;
+  user_email: string;
+  user_name: string;
+}
+
+interface NoteCardNote {
+  id: string;
+  title: string;
+  content?: string | null;
+  color?: string | null;
+  labels?: string[];
+  attachments?: Attachment[];
+  reactions?: Reaction[];
+  is_pinned?: boolean;
+  author_name?: string | null;
+  created_by: string;
+  group_id?: string;
+}
+
 interface NoteCardProps {
-  note: any;
+  note: NoteCardNote;
   onUpdate: () => void;
   onEdit: () => void;
   isCreator: boolean;
 }
+
 
 export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
   const { user } = useAuth();
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [showEditRequest, setShowEditRequest] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const { deleteNoteWithCleanup } = useDeleteNoteWithCleanup();
 
   const canEdit = note.created_by === user?.id;
 
@@ -59,19 +89,15 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
       if (error) throw error;
       toast({ title: 'Success', description: note.is_pinned ? 'Note unpinned' : 'Note pinned' });
       onUpdate();
-    } catch (error: any) {
+    } catch (error) {
       toast({ title: 'Error', description: 'Failed to update note', variant: 'destructive' });
     }
   };
 
   const handleDelete = async () => {
-    try {
-      const { error } = await supabase.from('notes').delete().eq('id', note.id);
-      if (error) throw error;
-      toast({ title: 'Success', description: 'Note deleted' });
+    const success = await deleteNoteWithCleanup(note.id, note.attachments);
+    if (success) {
       onUpdate();
-    } catch (error: any) {
-      toast({ title: 'Error', description: 'Failed to delete note', variant: 'destructive' });
     }
   };
 
@@ -85,41 +111,41 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
 
       const reactions = note.reactions || [];
       const existingIndex = reactions.findIndex(
-        (r: any) => r.emoji === emoji && r.user_email === profile?.email
+        (r) => r.emoji === emoji && r.user_email === profile?.email
       );
 
-      let newReactions;
+      let newReactions: Reaction[];
       if (existingIndex >= 0) {
-        newReactions = reactions.filter((_: any, i: number) => i !== existingIndex);
+        newReactions = reactions.filter((_, i) => i !== existingIndex);
       } else {
         newReactions = [
           ...reactions,
           {
             emoji,
-            user_email: profile?.email,
-            user_name: profile?.full_name,
+            user_email: profile?.email || '',
+            user_name: profile?.full_name || '',
           },
         ];
       }
 
       const { error } = await supabase
         .from('notes')
-        .update({ reactions: newReactions })
+        .update({ reactions: JSON.parse(JSON.stringify(newReactions)) })
         .eq('id', note.id);
 
       if (error) throw error;
       onUpdate();
-    } catch (error: any) {
+    } catch (error) {
       toast({ title: 'Error', description: 'Failed to add reaction', variant: 'destructive' });
     }
   };
 
   const getReactionCount = (emoji: string) => {
-    return note.reactions?.filter((r: any) => r.emoji === emoji).length || 0;
+    return note.reactions?.filter((r) => r.emoji === emoji).length || 0;
   };
 
   const hasUserReacted = (emoji: string) => {
-    return note.reactions?.some((r: any) => r.emoji === emoji && r.user_email === user?.email);
+    return note.reactions?.some((r) => r.emoji === emoji && r.user_email === user?.email);
   };
 
   const getBgColor = () => {
@@ -136,7 +162,7 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
     return colors[note.color || 'white'] || colors.white;
   };
 
-  const firstImage = note.attachments?.find((a: any) => a.type?.startsWith('image/'));
+  const firstImage = note.attachments?.find((a) => a.type?.startsWith('image/'));
 
   return (
     <>
