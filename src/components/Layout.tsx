@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bell, Home, FileText, Shield, Sun, Moon, Menu, User, LogOut } from 'lucide-react';
+import logo from '@/assets/collabnotes-logo.png';
 import { Button } from './ui/button';
 import {
   DropdownMenu,
@@ -112,8 +113,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-6">
             <Link to="/dashboard" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-primary" />
-              <span className="text-xl font-bold">CollabNotes</span>
+              <img src={logo} alt="CollabNotes" className="h-10 w-auto" />
             </Link>
             <nav className="hidden md:flex items-center gap-2">
               <NavLinks />

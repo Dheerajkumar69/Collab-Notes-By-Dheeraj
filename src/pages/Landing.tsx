@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Users, FileText, Share2, Lock, Palette, Bell, ArrowRight } from 'lucide-react';
 import heroImage from '@/assets/hero-bg.jpg';
+import logo from '@/assets/collabnotes-logo.png';
 
 export default function Landing() {
   const features = [
@@ -42,10 +43,7 @@ export default function Landing() {
       {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-primary" />
-            <span className="text-xl font-bold">CollabNotes</span>
-          </div>
+          <img src={logo} alt="CollabNotes" className="h-10 w-auto" />
           <Link to="/auth">
             <Button variant="default" className="bg-gradient-primary">
               Sign In
