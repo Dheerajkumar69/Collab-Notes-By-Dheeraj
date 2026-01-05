@@ -12,6 +12,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { signInSchema, signUpSchema, SignInFormData, SignUpFormData } from '@/lib/validation';
 import { supabase } from '@/integrations/supabase/client';
+import logo from '@/assets/collabnotes-logo.png';
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -125,8 +126,8 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-hero p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="h-10 w-10 rounded-lg bg-gradient-primary" />
+          <div className="flex items-center gap-3 mb-2">
+            <img src={logo} alt="CollabNotes" className="h-10 w-10 rounded-full object-cover" />
             <CardTitle className="text-2xl">CollabNotes</CardTitle>
           </div>
           <CardDescription>Sign in or create an account to get started</CardDescription>

@@ -43,7 +43,7 @@ export default function Landing() {
       {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
-          <img src={logo} alt="CollabNotes" className="h-10 w-auto" />
+          <img src={logo} alt="CollabNotes" className="h-10 w-10 rounded-full object-cover" />
           <Link to="/auth">
             <Button variant="default" className="bg-gradient-primary">
               Sign In
