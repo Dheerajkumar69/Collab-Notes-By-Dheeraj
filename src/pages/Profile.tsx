@@ -12,6 +12,7 @@ import { Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { updateProfileSchema, UpdateProfileFormData } from '@/lib/validation';
+import { SEOHead } from '@/components/SEOHead';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -118,6 +119,7 @@ export default function Profile() {
 
   return (
     <Layout>
+      <SEOHead title="Profile" description="Manage your account settings and preferences." />
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Profile Settings</h1>

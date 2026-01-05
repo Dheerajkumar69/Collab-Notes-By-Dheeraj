@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { signInSchema, signUpSchema, SignInFormData, SignUpFormData } from '@/lib/validation';
 import { supabase } from '@/integrations/supabase/client';
+import { SEOHead } from '@/components/SEOHead';
+import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
 import logo from '@/assets/collabnotes-logo.png';
 
 export default function Auth() {
@@ -21,6 +23,7 @@ export default function Auth() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
+  const [passwordValue, setPasswordValue] = useState('');
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
 
@@ -123,8 +126,10 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-hero p-4">
-      <Card className="w-full max-w-md">
+    <>
+      <SEOHead title="Sign In" description="Sign in or create an account to access CollabNotes." />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-hero p-4">
+        <Card className="w-full max-w-md">
         <CardHeader>
           <div className="flex items-center gap-3 mb-2">
             <img src={logo} alt="CollabNotes" className="h-10 w-10 rounded-full object-cover" />
@@ -217,10 +222,13 @@ export default function Auth() {
                   <Input
                     id="signup-password"
                     type="password"
-                    {...registerSignUp('password')}
+                    {...registerSignUp('password', {
+                      onChange: (e) => setPasswordValue(e.target.value),
+                    })}
                   />
+                  <PasswordStrengthIndicator password={passwordValue} />
                   {signUpErrors.password && (
-                    <p className="text-sm text-red-500 mt-1">{signUpErrors.password.message}</p>
+                    <p className="text-sm text-destructive mt-1">{signUpErrors.password.message}</p>
                   )}
                 </div>
                 <Button type="submit" className="w-full bg-gradient-primary" disabled={isLoading}>
@@ -273,6 +281,14 @@ export default function Auth() {
           </Tabs>
         </CardContent>
       </Card>
+      <div className="absolute bottom-4 text-center w-full">
+        <div className="flex justify-center gap-4 text-xs text-muted-foreground">
+          <Link to="/terms" className="hover:text-foreground">Terms</Link>
+          <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
+          <Link to="/help" className="hover:text-foreground">Help</Link>
+        </div>
+      </div>
     </div>
+    </>
   );
 }
