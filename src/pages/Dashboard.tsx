@@ -10,6 +10,7 @@ import { JoinGroupDialog } from '@/components/JoinGroupDialog';
 import { useGroups, useProfile, useStats } from '@/hooks/supabase-hooks';
 import { useRealtimeGroups } from '@/hooks/useRealtimeSubscription';
 import { ErrorState } from '@/components/ErrorState';
+import { SEOHead } from '@/components/SEOHead';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Group = Tables<'groups'>;
@@ -98,6 +99,7 @@ export default function Dashboard() {
 
   return (
     <Layout>
+      <SEOHead title="Dashboard" description="Manage your collaborative workspaces and notes." />
       <div className="container py-8">
         {/* Welcome Header */}
         <div className="mb-8">

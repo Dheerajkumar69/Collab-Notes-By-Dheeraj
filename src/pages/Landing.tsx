@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Users, FileText, Share2, Lock, Palette, Bell, ArrowRight } from 'lucide-react';
 import heroImage from '@/assets/hero-bg.jpg';
 import logo from '@/assets/collabnotes-logo.png';
+import { SEOHead } from '@/components/SEOHead';
 
 export default function Landing() {
   const features = [
@@ -39,7 +40,9 @@ export default function Landing() {
   ];
 
   return (
-    <div className="min-h-screen">
+    <>
+      <SEOHead />
+      <div className="min-h-screen">
       {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
@@ -136,10 +139,20 @@ export default function Landing() {
 
       {/* Footer */}
       <footer className="border-t py-8">
-        <div className="container text-center text-sm text-muted-foreground">
-          © 2025 CollabNotes. All rights reserved.
+        <div className="container">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="text-sm text-muted-foreground">
+              © 2025 CollabNotes. All rights reserved.
+            </div>
+            <div className="flex gap-6 text-sm text-muted-foreground">
+              <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+              <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+              <Link to="/help" className="hover:text-foreground transition-colors">Help</Link>
+            </div>
+          </div>
         </div>
       </footer>
     </div>
+    </>
   );
 }

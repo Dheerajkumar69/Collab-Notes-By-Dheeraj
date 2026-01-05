@@ -18,6 +18,7 @@ import { useGroups } from '@/hooks/supabase-hooks';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ErrorState } from '@/components/ErrorState';
+import { SEOHead } from '@/components/SEOHead';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Note = Tables<'notes'>;
@@ -175,6 +176,7 @@ export default function AllNotes() {
 
   return (
     <Layout>
+      <SEOHead title="All Notes" description="Browse and search notes from all your groups." />
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
