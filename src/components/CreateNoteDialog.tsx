@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { Upload, X, Loader2 } from 'lucide-react';
+import { useTelegramSync } from '@/hooks/useTelegramSync';
 
 interface CreateNoteDialogProps {
   open: boolean;
@@ -42,6 +43,7 @@ export function CreateNoteDialog({
   editingNote,
 }: CreateNoteDialogProps) {
   const { user } = useAuth();
+  const { syncNoteToTelegram } = useTelegramSync();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [labels, setLabels] = useState<string[]>([]);
@@ -209,14 +211,26 @@ export function CreateNoteDialog({
 
         if (error) throw error;
 
+        // Sync to Telegram in background
+        syncNoteToTelegram({ ...noteData, id: editingNote.id } as any);
+
         toast({
           title: 'Success',
           description: 'Note updated successfully',
         });
       } else {
-        const { error } = await supabase.from('notes').insert([noteData]);
+        const { data: insertedNote, error } = await supabase
+          .from('notes')
+          .insert([noteData])
+          .select()
+          .single();
 
         if (error) throw error;
+
+        // Sync to Telegram in background
+        if (insertedNote) {
+          syncNoteToTelegram(insertedNote as any);
+        }
 
         toast({
           title: 'Success',

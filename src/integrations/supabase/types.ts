@@ -115,9 +115,12 @@ export type Database = {
           edit_requests: Json | null
           group_id: string
           id: string
+          is_archived: boolean | null
           is_pinned: boolean | null
           labels: string[] | null
           reactions: Json | null
+          telegram_file_id: string | null
+          telegram_message_id: string | null
           title: string
           updated_at: string | null
         }
@@ -131,9 +134,12 @@ export type Database = {
           edit_requests?: Json | null
           group_id: string
           id?: string
+          is_archived?: boolean | null
           is_pinned?: boolean | null
           labels?: string[] | null
           reactions?: Json | null
+          telegram_file_id?: string | null
+          telegram_message_id?: string | null
           title: string
           updated_at?: string | null
         }
@@ -147,9 +153,12 @@ export type Database = {
           edit_requests?: Json | null
           group_id?: string
           id?: string
+          is_archived?: boolean | null
           is_pinned?: boolean | null
           labels?: string[] | null
           reactions?: Json | null
+          telegram_file_id?: string | null
+          telegram_message_id?: string | null
           title?: string
           updated_at?: string | null
         }
