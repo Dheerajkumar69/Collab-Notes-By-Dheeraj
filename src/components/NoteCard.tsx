@@ -8,6 +8,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import {
   Popover,
@@ -25,12 +26,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { MoreVertical, Pin, Edit, Trash2, Smile } from 'lucide-react';
+import { MoreVertical, Pin, Edit, Trash2, Smile, Archive, ArchiveRestore, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { NoteViewDialog } from './NoteViewDialog';
 import { EditRequestDialog } from './EditRequestDialog';
 import ReactMarkdown from 'react-markdown';
 import { useDeleteNoteWithCleanup } from '@/hooks/useDeleteNoteWithCleanup';
+import { useTelegramSync } from '@/hooks/useTelegramSync';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 
@@ -57,6 +59,8 @@ interface NoteCardNote {
   attachments?: Attachment[];
   reactions?: Reaction[];
   is_pinned?: boolean;
+  is_archived?: boolean;
+  telegram_file_id?: string | null;
   author_name?: string | null;
   created_by: string;
   group_id?: string;
@@ -75,7 +79,9 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [showEditRequest, setShowEditRequest] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const { deleteNoteWithCleanup } = useDeleteNoteWithCleanup();
+  const { archiveNote, unarchiveNote, deleteFromTelegram } = useTelegramSync();
 
   const canEdit = note.created_by === user?.id;
 
@@ -95,8 +101,28 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
   };
 
   const handleDelete = async () => {
+    // Delete from Telegram first
+    await deleteFromTelegram(note.id);
     const success = await deleteNoteWithCleanup(note.id, note.attachments);
     if (success) {
+      onUpdate();
+    }
+  };
+
+  const handleArchive = async () => {
+    setArchiving(true);
+    const result = await archiveNote(note.id);
+    setArchiving(false);
+    if (result) {
+      onUpdate();
+    }
+  };
+
+  const handleUnarchive = async () => {
+    setArchiving(true);
+    const result = await unarchiveNote(note.id);
+    setArchiving(false);
+    if (result) {
       onUpdate();
     }
   };
@@ -167,11 +193,18 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
   return (
     <>
       <Card
-        className={`${getBgColor()} p-4 hover:shadow-lg transition-shadow cursor-pointer group relative`}
+        className={`${getBgColor()} p-4 hover:shadow-lg transition-shadow cursor-pointer group relative ${note.is_archived ? 'opacity-70' : ''}`}
         onClick={() => setShowViewDialog(true)}
       >
         {note.is_pinned && (
           <Pin className="absolute top-2 right-2 h-4 w-4 text-primary" />
+        )}
+        
+        {note.is_archived && (
+          <Badge variant="secondary" className="absolute top-2 left-2 text-xs">
+            <Archive className="h-3 w-3 mr-1" />
+            Archived
+          </Badge>
         )}
 
         {firstImage && (
@@ -184,10 +217,16 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
 
         <h3 className="font-semibold text-lg mb-2 line-clamp-2">{note.title}</h3>
 
-        {note.content && (
+        {note.content && !note.is_archived && (
           <div className="text-muted-foreground text-sm mb-3 line-clamp-3 prose prose-sm dark:prose-invert max-w-none">
             <ReactMarkdown>{note.content}</ReactMarkdown>
           </div>
+        )}
+        
+        {note.is_archived && (
+          <p className="text-muted-foreground text-sm mb-3 italic">
+            Content stored in Telegram. Click to restore.
+          </p>
         )}
 
         {note.labels && note.labels.length > 0 && (
@@ -264,6 +303,34 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
                   <Pin className="h-4 w-4 mr-2" />
                   {note.is_pinned ? 'Unpin' : 'Pin'}
                 </DropdownMenuItem>
+                
+                {/* Archive/Unarchive option */}
+                {canEdit && (
+                  <>
+                    <DropdownMenuSeparator />
+                    {note.is_archived ? (
+                      <DropdownMenuItem onClick={handleUnarchive} disabled={archiving}>
+                        {archiving ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <ArchiveRestore className="h-4 w-4 mr-2" />
+                        )}
+                        Restore from Telegram
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem onClick={handleArchive} disabled={archiving}>
+                        {archiving ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Archive className="h-4 w-4 mr-2" />
+                        )}
+                        Archive to Telegram
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                
                 {canEdit ? (
                   <>
                     <DropdownMenuItem onClick={onEdit}>

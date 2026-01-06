@@ -5,9 +5,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { Layout } from '@/components/Layout';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Users, Shield, FolderOpen, FileText, Info } from 'lucide-react';
+import { Users, Shield, FolderOpen, FileText, Info, Cloud, Archive, Loader2 } from 'lucide-react';
+import { useTelegramSync } from '@/hooks/useTelegramSync';
 
 interface StatsCard {
   title: string;
@@ -37,13 +39,18 @@ interface Group {
 export default function Admin() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { bulkSyncNotes, autoArchiveOldNotes } = useTelegramSync();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalAdmins: 0,
     totalGroups: 0,
     totalNotes: 0,
+    archivedNotes: 0,
+    syncedNotes: 0,
   });
   const [users, setUsers] = useState<Profile[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
@@ -118,6 +125,18 @@ export default function Admin() {
         .from('notes')
         .select('*', { count: 'exact', head: true });
 
+      // Fetch archived notes count
+      const { count: archivedCount } = await supabase
+        .from('notes')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_archived', true);
+
+      // Fetch synced notes count
+      const { count: syncedCount } = await supabase
+        .from('notes')
+        .select('*', { count: 'exact', head: true })
+        .not('telegram_message_id', 'is', null);
+
       // Calculate stats
       const adminCount =
         rolesData?.filter(r => r.role === 'admin').length || 0;
@@ -127,6 +146,8 @@ export default function Admin() {
         totalAdmins: adminCount,
         totalGroups: groupsData?.length || 0,
         totalNotes: notesCount || 0,
+        archivedNotes: archivedCount || 0,
+        syncedNotes: syncedCount || 0,
       });
     } catch (error: any) {
       console.error('Error fetching admin data:', error);
@@ -143,6 +164,20 @@ export default function Admin() {
   const getCreatorEmail = (userId: string): string => {
     const user = users.find(u => u.id === userId);
     return user?.email || 'Unknown';
+  };
+
+  const handleBulkSync = async () => {
+    setSyncing(true);
+    await bulkSyncNotes();
+    await fetchAdminData();
+    setSyncing(false);
+  };
+
+  const handleAutoArchive = async () => {
+    setArchiving(true);
+    await autoArchiveOldNotes();
+    await fetchAdminData();
+    setArchiving(false);
   };
 
   const statsCards: StatsCard[] = [
@@ -169,6 +204,18 @@ export default function Admin() {
       value: stats.totalNotes,
       icon: <FileText className="h-6 w-6" />,
       color: 'from-pink-500 to-pink-600',
+    },
+    {
+      title: 'Synced to Telegram',
+      value: stats.syncedNotes,
+      icon: <Cloud className="h-6 w-6" />,
+      color: 'from-cyan-500 to-cyan-600',
+    },
+    {
+      title: 'Archived Notes',
+      value: stats.archivedNotes,
+      icon: <Archive className="h-6 w-6" />,
+      color: 'from-amber-500 to-amber-600',
     },
   ];
 
@@ -199,8 +246,45 @@ export default function Admin() {
           </AlertDescription>
         </Alert>
 
+        {/* Telegram Sync Controls */}
+        <Card className="p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Cloud className="h-5 w-5" />
+            Telegram Storage Management
+          </h2>
+          <p className="text-muted-foreground mb-4">
+            Manage note synchronization with Telegram. Notes are automatically synced when created.
+          </p>
+          <div className="flex gap-4 flex-wrap">
+            <Button
+              onClick={handleBulkSync}
+              disabled={syncing}
+              className="bg-gradient-to-r from-cyan-600 to-blue-600"
+            >
+              {syncing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Cloud className="h-4 w-4 mr-2" />
+              )}
+              Sync All Notes to Telegram
+            </Button>
+            <Button
+              onClick={handleAutoArchive}
+              disabled={archiving}
+              variant="outline"
+            >
+              {archiving ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Archive className="h-4 w-4 mr-2" />
+              )}
+              Archive Notes Older Than 30 Days
+            </Button>
+          </div>
+        </Card>
+
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {statsCards.map(stat => (
             <Card key={stat.title} className="p-6">
               <div className="flex items-center justify-between mb-4">
