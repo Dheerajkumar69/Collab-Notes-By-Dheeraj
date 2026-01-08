@@ -5,9 +5,12 @@ import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Search, Users, FileText, TrendingUp, Folder, Sparkles } from 'lucide-react';
+import { Plus, Search, Users, FileText, TrendingUp, Folder, Download } from 'lucide-react';
 import { CreateGroupDialog } from '@/components/CreateGroupDialog';
 import { JoinGroupDialog } from '@/components/JoinGroupDialog';
+import { FeedbackDialog } from '@/components/FeedbackDialog';
+import { ExportNotesDialog } from '@/components/ExportNotesDialog';
+import { ArchivedNotesSection } from '@/components/ArchivedNotesSection';
 import { useGroups, useProfile, useStats } from '@/hooks/supabase-hooks';
 import { useRealtimeGroups } from '@/hooks/useRealtimeSubscription';
 import { ErrorState } from '@/components/ErrorState';
@@ -117,7 +120,7 @@ export default function Dashboard() {
               ! 👋
             </motion.h1>
             <p className="text-muted-foreground text-lg">Manage your collaborative workspaces</p>
-            <div className="flex gap-3 mt-4">
+            <div className="flex flex-wrap gap-3 mt-4">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button 
                   className="bg-gradient-to-r from-primary to-secondary hover:opacity-90 gap-2 shadow-lg shadow-primary/25" 
@@ -132,6 +135,8 @@ export default function Dashboard() {
                   Join Group
                 </Button>
               </motion.div>
+              <ExportNotesDialog />
+              <FeedbackDialog />
             </div>
           </div>
         </FadeIn>
@@ -364,6 +369,13 @@ export default function Dashboard() {
             )}
           </>
         )}
+
+        {/* Archived Notes Section */}
+        <FadeIn delay={0.4}>
+          <div className="mt-8">
+            <ArchivedNotesSection />
+          </div>
+        </FadeIn>
       </div>
 
       <CreateGroupDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} onSuccess={() => {}} />

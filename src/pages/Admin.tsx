@@ -8,8 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Users, Shield, FolderOpen, FileText, Info, Cloud, Archive, Loader2 } from 'lucide-react';
+import { 
+  Users, Shield, FolderOpen, FileText, Info, Cloud, Archive, Loader2,
+  MessageSquare, Bug, Lightbulb, Wrench, HelpCircle, CheckCircle, XCircle, Eye
+} from 'lucide-react';
 import { useTelegramSync } from '@/hooks/useTelegramSync';
+import { useAllFeedback, useUpdateFeedbackStatus, type Feedback } from '@/hooks/useFeedback';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { format } from 'date-fns';
 
 interface StatsCard {
   title: string;
@@ -40,6 +46,8 @@ export default function Admin() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { bulkSyncNotes, autoArchiveOldNotes } = useTelegramSync();
+  const { data: allFeedback = [], isLoading: feedbackLoading } = useAllFeedback();
+  const updateFeedbackStatus = useUpdateFeedbackStatus();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -51,6 +59,7 @@ export default function Admin() {
     totalNotes: 0,
     archivedNotes: 0,
     syncedNotes: 0,
+    totalFeedback: 0,
   });
   const [users, setUsers] = useState<Profile[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
@@ -148,6 +157,7 @@ export default function Admin() {
         totalNotes: notesCount || 0,
         archivedNotes: archivedCount || 0,
         syncedNotes: syncedCount || 0,
+        totalFeedback: 0, // Will be updated from hook
       });
     } catch (error: any) {
       console.error('Error fetching admin data:', error);
@@ -217,7 +227,31 @@ export default function Admin() {
       icon: <Archive className="h-6 w-6" />,
       color: 'from-amber-500 to-amber-600',
     },
+    {
+      title: 'User Feedback',
+      value: allFeedback.length,
+      icon: <MessageSquare className="h-6 w-6" />,
+      color: 'from-green-500 to-green-600',
+    },
   ];
+
+  const getFeedbackIcon = (type: Feedback['type']) => {
+    switch (type) {
+      case 'bug': return <Bug className="h-4 w-4 text-red-500" />;
+      case 'feature': return <Lightbulb className="h-4 w-4 text-yellow-500" />;
+      case 'improvement': return <Wrench className="h-4 w-4 text-blue-500" />;
+      default: return <HelpCircle className="h-4 w-4 text-purple-500" />;
+    }
+  };
+
+  const getStatusBadge = (status: Feedback['status']) => {
+    switch (status) {
+      case 'pending': return <Badge variant="secondary">Pending</Badge>;
+      case 'reviewed': return <Badge className="bg-blue-500 text-white">Reviewed</Badge>;
+      case 'resolved': return <Badge className="bg-green-500 text-white">Resolved</Badge>;
+      case 'dismissed': return <Badge variant="outline">Dismissed</Badge>;
+    }
+  };
 
   if (loading) {
     return (
@@ -372,6 +406,106 @@ export default function Admin() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* User Feedback Section */}
+        <div className="mt-8">
+          <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
+            <MessageSquare className="h-6 w-6" />
+            User Feedback
+          </h2>
+          
+          {feedbackLoading ? (
+            <Card className="p-8 text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+            </Card>
+          ) : allFeedback.length === 0 ? (
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground">No feedback received yet</p>
+            </Card>
+          ) : (
+            <Tabs defaultValue="pending" className="w-full">
+              <TabsList className="mb-4">
+                <TabsTrigger value="pending">
+                  Pending ({allFeedback.filter(f => f.status === 'pending').length})
+                </TabsTrigger>
+                <TabsTrigger value="reviewed">
+                  Reviewed ({allFeedback.filter(f => f.status === 'reviewed').length})
+                </TabsTrigger>
+                <TabsTrigger value="resolved">
+                  Resolved ({allFeedback.filter(f => f.status === 'resolved').length})
+                </TabsTrigger>
+                <TabsTrigger value="all">All</TabsTrigger>
+              </TabsList>
+
+              {['pending', 'reviewed', 'resolved', 'all'].map(tab => (
+                <TabsContent key={tab} value={tab} className="space-y-4">
+                  {(tab === 'all' ? allFeedback : allFeedback.filter(f => f.status === tab))
+                    .map(feedback => (
+                      <Card key={feedback.id} className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              {getFeedbackIcon(feedback.type)}
+                              <span className="font-semibold">{feedback.subject}</span>
+                              {getStatusBadge(feedback.status)}
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-2">
+                              {feedback.message}
+                            </p>
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <span>From: {feedback.user_name || feedback.user_email}</span>
+                              <span>{format(new Date(feedback.created_at), 'MMM d, yyyy HH:mm')}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 shrink-0">
+                            {feedback.status === 'pending' && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateFeedbackStatus.mutate({ id: feedback.id, status: 'reviewed' })}
+                                  disabled={updateFeedbackStatus.isPending}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700"
+                                  onClick={() => updateFeedbackStatus.mutate({ id: feedback.id, status: 'resolved' })}
+                                  disabled={updateFeedbackStatus.isPending}
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateFeedbackStatus.mutate({ id: feedback.id, status: 'dismissed' })}
+                                  disabled={updateFeedbackStatus.isPending}
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
+                            {feedback.status === 'reviewed' && (
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => updateFeedbackStatus.mutate({ id: feedback.id, status: 'resolved' })}
+                                disabled={updateFeedbackStatus.isPending}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Resolve
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                </TabsContent>
+              ))}
+            </Tabs>
+          )}
         </div>
       </div>
     </Layout>
