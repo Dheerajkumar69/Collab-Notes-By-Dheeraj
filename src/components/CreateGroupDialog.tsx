@@ -12,7 +12,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createGroupSchema, CreateGroupFormData } from '@/lib/validation';
 
-const colors = ['blue', 'green', 'purple', 'orange', 'pink', 'indigo'];
+const colorOptions = [
+  { name: 'blue', gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)' },
+  { name: 'green', gradient: 'linear-gradient(135deg, #22c55e, #16a34a)' },
+  { name: 'purple', gradient: 'linear-gradient(135deg, #a855f7, #9333ea)' },
+  { name: 'orange', gradient: 'linear-gradient(135deg, #f97316, #ea580c)' },
+  { name: 'pink', gradient: 'linear-gradient(135deg, #ec4899, #db2777)' },
+  { name: 'indigo', gradient: 'linear-gradient(135deg, #6366f1, #4f46e5)' },
+];
 
 interface CreateGroupDialogProps {
   open: boolean;
@@ -131,18 +138,16 @@ export const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroup
 
           <div>
             <Label>Color Theme</Label>
-            <div className="grid grid-cols-6 gap-2 mt-2">
-              {colors.map(color => (
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {colorOptions.map(({ name, gradient }) => (
                 <button
-                  key={color}
+                  key={name}
                   type="button"
-                  className={`h-10 rounded-lg border-2 transition-all ${
-                    selectedColor === color ? 'border-primary scale-110' : 'border-transparent'
-                  }`}
-                  style={{
-                    background: `linear-gradient(135deg, var(--color-${color}), var(--color-${color}))`,
-                  }}
-                  onClick={() => setSelectedColor(color)}
+                  className={`h-10 w-10 rounded-lg border-2 transition-all ${selectedColor === name ? 'border-primary ring-2 ring-primary ring-offset-2' : 'border-transparent hover:scale-105'
+                    }`}
+                  style={{ background: gradient }}
+                  onClick={() => setSelectedColor(name)}
+                  title={name}
                 />
               ))}
             </div>
