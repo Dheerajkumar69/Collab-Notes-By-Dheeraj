@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Layout } from '@/components/Layout';
@@ -18,6 +18,7 @@ import { SEOHead } from '@/components/SEOHead';
 import { DashboardSkeleton } from '@/components/motion/Skeleton';
 import { EmptyState } from '@/components/motion/EmptyState';
 import { FadeIn, StaggerContainer, StaggerItem, ScaleOnHover } from '@/components/motion/PageTransition';
+import { useKeyboardShortcuts, KeyboardShortcutsHint } from '@/hooks/useKeyboardShortcuts';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Group = Tables<'groups'>;
@@ -26,16 +27,23 @@ export default function Dashboard() {
   const { data: groups = [], isLoading: groupsLoading, isError: groupsError, refetch: refetchGroups } = useGroups();
   const { data: userProfile, isLoading: profileLoading, isError: profileError, refetch: refetchProfile } = useProfile();
   const { data: stats = { groups: 0, notes: 0, thisWeek: 0 }, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useStats();
-  
+
   // Enable realtime updates for groups
   useRealtimeGroups();
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('newest');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const GROUPS_PER_PAGE = 9;
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onCreateGroup: () => setCreateDialogOpen(true),
+    onSearch: () => searchInputRef.current?.focus(),
+  });
 
   const getColorClass = (color: string) => {
     const colorMap: Record<string, string> = {
@@ -90,7 +98,7 @@ export default function Dashboard() {
     return (
       <Layout>
         <div className="container py-8">
-          <ErrorState 
+          <ErrorState
             title="Failed to load dashboard"
             message="We couldn't load your data. Please check your connection and try again."
             onRetry={handleRetry}
@@ -107,7 +115,7 @@ export default function Dashboard() {
         {/* Welcome Header */}
         <FadeIn>
           <div className="mb-8">
-            <motion.h1 
+            <motion.h1
               className="text-4xl font-bold mb-2"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -122,8 +130,8 @@ export default function Dashboard() {
             <p className="text-muted-foreground text-lg">Manage your collaborative workspaces</p>
             <div className="flex flex-wrap gap-3 mt-4">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button 
-                  className="bg-gradient-to-r from-primary to-secondary hover:opacity-90 gap-2 shadow-lg shadow-primary/25" 
+                <Button
+                  className="bg-gradient-to-r from-primary to-secondary hover:opacity-90 gap-2 shadow-lg shadow-primary/25"
                   onClick={() => setCreateDialogOpen(true)}
                 >
                   <Plus size={18} />
@@ -147,11 +155,11 @@ export default function Dashboard() {
             <ScaleOnHover>
               <Card className="hover:shadow-xl transition-all border-2 hover:border-blue-500/30 overflow-hidden group">
                 <CardContent className="p-6 relative">
-                  <motion.div 
+                  <motion.div
                     className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"
                   />
                   <div className="flex items-center gap-4 relative z-10">
-                    <motion.div 
+                    <motion.div
                       className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30"
                       whileHover={{ rotate: [0, -10, 10, 0], scale: 1.1 }}
                       transition={{ duration: 0.5 }}
@@ -160,7 +168,7 @@ export default function Dashboard() {
                     </motion.div>
                     <div>
                       <p className="text-sm text-muted-foreground font-medium">Your Groups</p>
-                      <motion.p 
+                      <motion.p
                         className="text-3xl font-bold"
                         key={stats.groups}
                         initial={{ scale: 1.2, opacity: 0 }}
@@ -179,11 +187,11 @@ export default function Dashboard() {
             <ScaleOnHover>
               <Card className="hover:shadow-xl transition-all border-2 hover:border-green-500/30 overflow-hidden group">
                 <CardContent className="p-6 relative">
-                  <motion.div 
+                  <motion.div
                     className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"
                   />
                   <div className="flex items-center gap-4 relative z-10">
-                    <motion.div 
+                    <motion.div
                       className="h-14 w-14 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-500/30"
                       whileHover={{ rotate: [0, -10, 10, 0], scale: 1.1 }}
                       transition={{ duration: 0.5 }}
@@ -192,7 +200,7 @@ export default function Dashboard() {
                     </motion.div>
                     <div>
                       <p className="text-sm text-muted-foreground font-medium">Total Notes</p>
-                      <motion.p 
+                      <motion.p
                         className="text-3xl font-bold"
                         key={stats.notes}
                         initial={{ scale: 1.2, opacity: 0 }}
@@ -211,11 +219,11 @@ export default function Dashboard() {
             <ScaleOnHover>
               <Card className="hover:shadow-xl transition-all border-2 hover:border-purple-500/30 overflow-hidden group">
                 <CardContent className="p-6 relative">
-                  <motion.div 
+                  <motion.div
                     className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"
                   />
                   <div className="flex items-center gap-4 relative z-10">
-                    <motion.div 
+                    <motion.div
                       className="h-14 w-14 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30"
                       whileHover={{ rotate: [0, -10, 10, 0], scale: 1.1 }}
                       transition={{ duration: 0.5 }}
@@ -224,7 +232,7 @@ export default function Dashboard() {
                     </motion.div>
                     <div>
                       <p className="text-sm text-muted-foreground font-medium">This Week</p>
-                      <motion.p 
+                      <motion.p
                         className="text-3xl font-bold"
                         key={stats.thisWeek}
                         initial={{ scale: 1.2, opacity: 0 }}
@@ -242,7 +250,7 @@ export default function Dashboard() {
 
         {/* Search & Sort */}
         <FadeIn delay={0.2}>
-          <motion.div 
+          <motion.div
             className="flex flex-col md:flex-row gap-4 mb-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -251,7 +259,8 @@ export default function Dashboard() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
               <Input
-                placeholder="Search groups..."
+                ref={searchInputRef}
+                placeholder="Search groups... (Ctrl+K)"
                 value={searchTerm}
                 onChange={e => handleSearchChange(e.target.value)}
                 className="pl-10 h-12 text-base border-2 focus:border-primary/50 transition-colors"
@@ -342,7 +351,7 @@ export default function Dashboard() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <motion.div 
+              <motion.div
                 className="flex justify-center items-center gap-4 mt-8"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -378,8 +387,8 @@ export default function Dashboard() {
         </FadeIn>
       </div>
 
-      <CreateGroupDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} onSuccess={() => {}} />
-      <JoinGroupDialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen} onSuccess={() => {}} />
+      <CreateGroupDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} onSuccess={() => { }} />
+      <JoinGroupDialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen} onSuccess={() => { }} />
     </Layout>
   );
 }

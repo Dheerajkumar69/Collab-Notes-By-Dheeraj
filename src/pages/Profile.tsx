@@ -13,6 +13,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { updateProfileSchema, UpdateProfileFormData } from '@/lib/validation';
 import { SEOHead } from '@/components/SEOHead';
+import { AvatarUpload } from '@/components/AvatarUpload';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -20,6 +21,8 @@ export default function Profile() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [fullName, setFullName] = useState<string>('');
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<UpdateProfileFormData>({
     resolver: zodResolver(updateProfileSchema),
@@ -49,6 +52,8 @@ export default function Profile() {
         fullName: data.full_name,
         email: data.email,
       });
+      setFullName(data.full_name);
+      setAvatarUrl((data as any).avatar_url || null);
     } catch (error: any) {
       console.error('Error fetching profile:', error);
       toast({
@@ -86,6 +91,7 @@ export default function Profile() {
 
       if (authError) throw authError;
 
+      setFullName(data.fullName);
       toast({
         title: 'Success',
         description: 'Profile updated successfully',
@@ -125,6 +131,21 @@ export default function Profile() {
           <h1 className="text-4xl font-bold mb-2">Profile Settings</h1>
           <p className="text-muted-foreground">Manage your account settings</p>
         </div>
+
+        {/* Avatar Section */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Profile Picture</CardTitle>
+            <CardDescription>Upload a photo to personalize your profile</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AvatarUpload
+              currentAvatarUrl={avatarUrl}
+              fullName={fullName}
+              onUploadComplete={(url) => setAvatarUrl(url || null)}
+            />
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

@@ -2,133 +2,174 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
 } from '@/components/ui/popover';
 import { Smile } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import type { Json } from '@/integrations/supabase/types';
 
-const EMOJIS = ['👍', '❤️', '😂', '🎉', '🔥', '👏', '😮', '😢'];
+const EMOJIS = ['👍', '❤️', '😂', '🎉', '🔥', '👏', '✅', '💯'];
 
 interface Reaction {
-  emoji: string;
-  user_id: string;
-  user_name: string;
+    emoji: string;
+    user_id: string;
+    user_name: string;
 }
 
 interface MessageReactionsProps {
-  messageId: string;
-  reactions: Reaction[];
-  currentUserId: string;
-  isOwnMessage: boolean;
+    messageId: string;
+    reactions: Reaction[];
+    currentUserId: string;
+    isOwnMessage: boolean;
 }
 
+// Helper hook to handle reaction logic
+const useReactionHandler = (
+    messageId: string,
+    reactions: Reaction[],
+    currentUserId: string
+) => {
+    const [isUpdating, setIsUpdating] = useState(false);
+
+    const handleReaction = async (emoji: string) => {
+        if (isUpdating || !currentUserId) return;
+
+        setIsUpdating(true);
+        try {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', currentUserId)
+                .single();
+
+            const currentReactions = reactions || [];
+
+            // Find if user has any existing reaction
+            const existingUserReaction = currentReactions.find(
+                (r) => r.user_id === currentUserId
+            );
+
+            let newReactions: Reaction[];
+
+            if (existingUserReaction?.emoji === emoji) {
+                // User clicked the same emoji - remove their reaction (toggle off)
+                newReactions = currentReactions.filter((r) => r.user_id !== currentUserId);
+            } else {
+                // Remove any existing reaction from this user, then add the new one
+                const filteredReactions = currentReactions.filter((r) => r.user_id !== currentUserId);
+                newReactions = [
+                    ...filteredReactions,
+                    {
+                        emoji,
+                        user_id: currentUserId,
+                        user_name: profile?.full_name || 'Unknown',
+                    },
+                ];
+            }
+
+            const { error } = await supabase
+                .from('messages')
+                .update({ reactions: newReactions as unknown as Json })
+                .eq('id', messageId);
+
+            if (error) throw error;
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: 'Failed to add reaction',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    return { handleReaction, isUpdating };
+};
+
+// Shows only existing reaction badges (no add button)
 export const MessageReactions = ({
-  messageId,
-  reactions = [],
-  currentUserId,
-  isOwnMessage,
+    messageId,
+    reactions,
+    currentUserId,
+    isOwnMessage,
 }: MessageReactionsProps) => {
-  const [isOpen, setIsOpen] = useState(false);
+    const { handleReaction } = useReactionHandler(messageId, reactions, currentUserId);
 
-  const handleReaction = async (emoji: string, userName: string) => {
-    try {
-      const existingIndex = reactions.findIndex(
-        (r) => r.emoji === emoji && r.user_id === currentUserId
-      );
+    const getReactionCount = (emoji: string) => {
+        return reactions?.filter((r) => r.emoji === emoji).length || 0;
+    };
 
-      let newReactions: { emoji: string; user_id: string; user_name: string }[];
-      if (existingIndex >= 0) {
-        // Remove reaction
-        newReactions = reactions.filter((_, i) => i !== existingIndex);
-      } else {
-        // Add reaction
-        newReactions = [
-          ...reactions,
-          { emoji, user_id: currentUserId, user_name: userName },
-        ];
-      }
+    const hasUserReacted = (emoji: string) => {
+        return reactions?.some((r) => r.emoji === emoji && r.user_id === currentUserId);
+    };
 
-      const { error } = await supabase
-        .from('messages')
-        .update({ reactions: newReactions as Json })
-        .eq('id', messageId);
+    const uniqueReactions = EMOJIS.filter((emoji) => getReactionCount(emoji) > 0);
 
-      if (error) throw error;
-      setIsOpen(false);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to add reaction',
-        variant: 'destructive',
-      });
-    }
-  };
+    if (uniqueReactions.length === 0) return null;
 
-  const getReactionCount = (emoji: string) => {
-    return reactions.filter((r) => r.emoji === emoji).length;
-  };
-
-  const hasUserReacted = (emoji: string) => {
-    return reactions.some((r) => r.emoji === emoji && r.user_id === currentUserId);
-  };
-
-  const uniqueEmojis = [...new Set(reactions.map((r) => r.emoji))];
-
-  return (
-    <div className="flex items-center gap-1 flex-wrap">
-      {/* Display existing reactions */}
-      {uniqueEmojis.map((emoji) => (
-        <Badge
-          key={emoji}
-          variant={hasUserReacted(emoji) ? 'default' : 'outline'}
-          className={`text-xs cursor-pointer px-1.5 py-0.5 ${
-            isOwnMessage
-              ? hasUserReacted(emoji)
-                ? 'bg-white/30 hover:bg-white/40 border-0'
-                : 'bg-white/10 hover:bg-white/20 border-white/30'
-              : ''
-          }`}
-          onClick={(e) => {
-            e.stopPropagation();
-            handleReaction(emoji, '');
-          }}
-        >
-          {emoji} {getReactionCount(emoji)}
-        </Badge>
-      ))}
-
-      {/* Add reaction button */}
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity ${
-              isOwnMessage ? 'text-white/70 hover:text-white hover:bg-white/20' : ''
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Smile className="h-3 w-3" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-2" onClick={(e) => e.stopPropagation()}>
-          <div className="flex gap-1.5">
-            {EMOJIS.map((emoji) => (
-              <button
-                key={emoji}
-                onClick={() => handleReaction(emoji, '')}
-                className="text-xl hover:scale-125 transition-transform p-1"
-              >
-                {emoji}
-              </button>
+    return (
+        <div className="flex items-center gap-1 flex-wrap">
+            {uniqueReactions.map((emoji) => (
+                <Badge
+                    key={emoji}
+                    variant={hasUserReacted(emoji) ? 'default' : 'outline'}
+                    className={`text-xs cursor-pointer transition-transform hover:scale-105 ${isOwnMessage ? 'bg-primary-foreground/20 hover:bg-primary-foreground/30' : ''
+                        }`}
+                    onClick={() => handleReaction(emoji)}
+                >
+                    {emoji} {getReactionCount(emoji)}
+                </Badge>
             ))}
-          </div>
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
+        </div>
+    );
+};
+
+// Separate add reaction button for placing outside the message bubble
+interface AddReactionButtonProps {
+    messageId: string;
+    reactions: Reaction[];
+    currentUserId: string;
+}
+
+export const AddReactionButton = ({
+    messageId,
+    reactions,
+    currentUserId,
+}: AddReactionButtonProps) => {
+    const { handleReaction, isUpdating } = useReactionHandler(messageId, reactions, currentUserId);
+
+    return (
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 touch-manipulation"
+                    disabled={isUpdating}
+                >
+                    <Smile className="h-4 w-4" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-3" side="top" sideOffset={8}>
+                <div className="flex gap-1 flex-wrap max-w-[200px]">
+                    {EMOJIS.map((emoji) => (
+                        <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => handleReaction(emoji)}
+                            className="text-2xl p-2 hover:scale-110 active:scale-95 transition-transform rounded-lg hover:bg-muted touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                            disabled={isUpdating}
+                        >
+                            {emoji}
+                        </button>
+                    ))}
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
 };

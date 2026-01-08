@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
+import {
   Users, Shield, FolderOpen, FileText, Info, Cloud, Archive, Loader2,
   MessageSquare, Bug, Lightbulb, Wrench, HelpCircle, CheckCircle, XCircle, Eye
 } from 'lucide-react';
@@ -72,14 +72,6 @@ export default function Admin() {
   const checkAdminStatus = async () => {
     if (!user) {
       navigate('/');
-      return;
-    }
-
-    // Temporary bypass for the specific test user
-    // REMOVE THIS IN PRODUCTION
-    if (user.email === 'dksgamery@gmail.com') {
-      setIsAdmin(true);
-      fetchAdminData();
       return;
     }
 
@@ -414,7 +406,7 @@ export default function Admin() {
             <MessageSquare className="h-6 w-6" />
             User Feedback
           </h2>
-          
+
           {feedbackLoading ? (
             <Card className="p-8 text-center">
               <Loader2 className="h-6 w-6 animate-spin mx-auto" />

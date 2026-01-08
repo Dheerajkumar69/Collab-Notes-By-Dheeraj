@@ -82,9 +82,9 @@ export function FeedbackDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button 
-          variant="outline" 
-          className="gap-2 border-dashed hover:border-primary hover:bg-primary/5 transition-all duration-300"
+        <Button
+          variant="outline"
+          className="gap-2 hover:border-primary hover:bg-primary/5 hover:text-foreground transition-all duration-300"
         >
           <MessageSquarePlus size={18} />
           Send Feedback
@@ -124,8 +124,8 @@ export function FeedbackDialog() {
                     onClick={() => setType(feedbackType.value)}
                     className={`
                       p-4 rounded-xl border-2 transition-all duration-200 text-left
-                      ${isSelected 
-                        ? `${feedbackType.bgColor} border-current ${feedbackType.color}` 
+                      ${isSelected
+                        ? `${feedbackType.bgColor} border-current ${feedbackType.color}`
                         : 'border-border hover:border-muted-foreground/30 bg-muted/30'
                       }
                     `}
@@ -155,11 +155,11 @@ export function FeedbackDialog() {
                   <Input
                     id="subject"
                     placeholder={
-                      type === 'bug' 
-                        ? 'e.g., Notes not saving properly' 
+                      type === 'bug'
+                        ? 'e.g., Notes not saving properly'
                         : type === 'feature'
-                        ? 'e.g., Add dark mode support'
-                        : 'Brief summary of your feedback'
+                          ? 'e.g., Add dark mode support'
+                          : 'Brief summary of your feedback'
                     }
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
@@ -178,8 +178,8 @@ export function FeedbackDialog() {
                       type === 'bug'
                         ? 'Please describe what happened, what you expected, and steps to reproduce...'
                         : type === 'feature'
-                        ? 'Describe the feature you\'d like to see and how it would help you...'
-                        : 'Share your thoughts, suggestions, or ideas...'
+                          ? 'Describe the feature you\'d like to see and how it would help you...'
+                          : 'Share your thoughts, suggestions, or ideas...'
                     }
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}

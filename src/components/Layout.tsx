@@ -21,6 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeSubscription';
 import { useNotifications, useMarkNotificationRead, useProfile } from '@/hooks/supabase-hooks';
+import { InstallPrompt } from './InstallPrompt';
 
 export const Layout = ({ children }: { children: ReactNode }) => {
   const { user, signOut } = useAuth();
@@ -206,6 +207,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
       </header>
 
       <main>{children}</main>
+      <InstallPrompt />
     </div>
   );
 };

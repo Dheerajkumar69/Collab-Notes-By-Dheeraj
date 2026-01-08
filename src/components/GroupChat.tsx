@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { TypingIndicator, useTypingIndicator } from './TypingIndicator';
-import { MessageReactions } from './MessageReactions';
+import { MessageReactions, AddReactionButton } from './MessageReactions';
 import { ChatFileUpload, ChatAttachmentPreview } from './ChatFileUpload';
 import type { Json } from '@/integrations/supabase/types';
 
@@ -61,13 +61,13 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
   const [userName, setUserName] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  
+
   const { startTyping, stopTyping } = useTypingIndicator(groupId);
 
   useEffect(() => {
     fetchMessages();
     fetchUserName();
-    
+
     // Subscribe to realtime messages
     const channel = supabase
       .channel(`messages-${groupId}`)
@@ -90,7 +90,7 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
             }]);
           } else if (payload.eventType === 'UPDATE') {
             const updatedMsg = payload.new as Message;
-            setMessages(prev => 
+            setMessages(prev =>
               prev.map(m => m.id === updatedMsg.id ? {
                 ...updatedMsg,
                 reactions: (updatedMsg.reactions as unknown as Reaction[]) || [],
@@ -161,7 +161,7 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
 
     setSending(true);
     stopTyping();
-    
+
     try {
       const { error } = await supabase.from('messages').insert({
         group_id: groupId,
@@ -173,6 +173,39 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
       });
 
       if (error) throw error;
+
+      // Notify other group members
+      try {
+        const { data: group } = await supabase
+          .from('groups')
+          .select('members, name')
+          .eq('id', groupId)
+          .single();
+
+        if (group?.members) {
+          // Get user IDs for all members except sender
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, email')
+            .in('email', group.members);
+
+          const otherMembers = profiles?.filter(p => p.id !== user.id) || [];
+
+          // Create notifications for each member
+          for (const member of otherMembers) {
+            await supabase.from('notifications').insert({
+              user_id: member.id,
+              message: `💬 ${userName} sent a message in ${group.name}`,
+              link: `/group/${groupId}`,
+              is_read: false,
+            });
+          }
+        }
+      } catch (notifyError) {
+        // Don't fail the message send if notifications fail
+        console.error('Failed to send notifications:', notifyError);
+      }
+
       setNewMessage('');
       setReplyingTo(null);
       setPendingFiles([]);
@@ -241,11 +274,11 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
 
   const groupMessagesByDate = (msgs: Message[]) => {
     const groups: { date: string; messages: Message[] }[] = [];
-    
+
     msgs.forEach(msg => {
       const date = new Date(msg.created_at);
       let dateLabel: string;
-      
+
       if (isToday(date)) {
         dateLabel = 'Today';
       } else if (isYesterday(date)) {
@@ -253,7 +286,7 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
       } else {
         dateLabel = format(date, 'MMMM d, yyyy');
       }
-      
+
       const existingGroup = groups.find(g => g.date === dateLabel);
       if (existingGroup) {
         existingGroup.messages.push(msg);
@@ -261,7 +294,7 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
         groups.push({ date: dateLabel, messages: [msg] });
       }
     });
-    
+
     return groups;
   };
 
@@ -300,13 +333,13 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
                     {group.date}
                   </span>
                 </div>
-                
+
                 {/* Messages */}
                 <div className="space-y-2">
                   {group.messages.map(msg => {
                     const isOwnMessage = msg.user_id === user?.id;
                     const replyMsg = msg.reply_to ? getReplyMessage(msg.reply_to) : null;
-                    
+
                     return (
                       <div
                         key={msg.id}
@@ -320,27 +353,25 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
                               </AvatarFallback>
                             </Avatar>
                           )}
-                          
+
                           <div className="group relative">
                             <div
-                              className={`px-3 py-2 rounded-2xl ${
-                                isOwnMessage
-                                  ? 'bg-primary text-primary-foreground rounded-br-md'
-                                  : 'bg-muted rounded-bl-md'
-                              }`}
+                              className={`px-3 py-2 rounded-2xl ${isOwnMessage
+                                ? 'bg-primary text-primary-foreground rounded-br-md'
+                                : 'bg-muted rounded-bl-md'
+                                }`}
                             >
                               {/* Reply Preview */}
                               {replyMsg && (
-                                <div className={`text-xs mb-1 px-2 py-1 rounded border-l-2 ${
-                                  isOwnMessage 
-                                    ? 'bg-primary-foreground/10 border-primary-foreground/50' 
-                                    : 'bg-background/50 border-primary/50'
-                                }`}>
+                                <div className={`text-xs mb-1 px-2 py-1 rounded border-l-2 ${isOwnMessage
+                                  ? 'bg-primary-foreground/10 border-primary-foreground/50'
+                                  : 'bg-background/50 border-primary/50'
+                                  }`}>
                                   <span className="font-medium">{replyMsg.user_name}</span>
                                   <p className="truncate opacity-80">{replyMsg.message}</p>
                                 </div>
                               )}
-                              
+
                               {!isOwnMessage && (
                                 <p className="text-xs font-medium text-primary mb-1">
                                   {msg.user_name}
@@ -349,12 +380,12 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
 
                               {/* Attachments */}
                               {msg.attachments && msg.attachments.length > 0 && (
-                                <ChatAttachmentPreview 
-                                  attachments={msg.attachments} 
+                                <ChatAttachmentPreview
+                                  attachments={msg.attachments}
                                   isOwnMessage={isOwnMessage}
                                 />
                               )}
-                              
+
                               {editingMessage?.id === msg.id ? (
                                 <div className="flex gap-2">
                                   <Input
@@ -373,10 +404,9 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
                               ) : (
                                 <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
                               )}
-                              
-                              <div className={`flex items-center gap-1 mt-1 text-[10px] ${
-                                isOwnMessage ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                              }`}>
+
+                              <div className={`flex items-center gap-1 mt-1 text-[10px] ${isOwnMessage ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                                }`}>
                                 <span>{formatMessageTime(msg.created_at)}</span>
                                 {msg.is_edited && <span>• edited</span>}
                               </div>
@@ -393,11 +423,15 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
                                 </div>
                               )}
                             </div>
-                            
+
                             {/* Message Actions */}
-                            <div className={`absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity ${
-                              isOwnMessage ? '-left-8' : '-right-8'
-                            }`}>
+                            <div className={`absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 ${isOwnMessage ? '-left-16' : '-right-16'
+                              }`}>
+                              <AddReactionButton
+                                messageId={msg.id}
+                                reactions={msg.reactions || []}
+                                currentUserId={user?.id || ''}
+                              />
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" size="icon" className="h-6 w-6">
@@ -421,7 +455,7 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
                                         <Pencil className="h-4 w-4 mr-2" />
                                         Edit
                                       </DropdownMenuItem>
-                                      <DropdownMenuItem 
+                                      <DropdownMenuItem
                                         onClick={() => handleDelete(msg.id)}
                                         className="text-destructive"
                                       >
@@ -481,9 +515,9 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
             className="flex-1"
             disabled={sending}
           />
-          <Button 
-            type="submit" 
-            size="icon" 
+          <Button
+            type="submit"
+            size="icon"
             disabled={(!newMessage.trim() && pendingFiles.length === 0) || sending}
             className="bg-primary hover:bg-primary/90"
           >

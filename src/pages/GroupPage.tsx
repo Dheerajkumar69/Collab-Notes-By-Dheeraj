@@ -348,10 +348,10 @@ export default function GroupPage() {
           style={
             group.background_image_url
               ? {
-                  backgroundImage: `url(${group.background_image_url})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }
+                backgroundImage: `url(${group.background_image_url})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }
               : {}
           }
         >
@@ -408,25 +408,80 @@ export default function GroupPage() {
 
         {/* Content */}
         <div className="max-w-7xl mx-auto px-4">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'split' | 'members')} className="w-full">
-            <TabsList className="mb-6">
-              <TabsTrigger value="split">Chat & Notes</TabsTrigger>
-              <TabsTrigger value="members">Members</TabsTrigger>
-            </TabsList>
+          {isMobile ? (
+            // Mobile: Separate tabs for Chat, Notes, and Members
+            <Tabs defaultValue="chat" className="w-full">
+              <TabsList className="mb-6 w-full grid grid-cols-3">
+                <TabsTrigger value="chat">💬 Chat</TabsTrigger>
+                <TabsTrigger value="notes">📝 Notes</TabsTrigger>
+                <TabsTrigger value="members">👥 Members</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="split" className="mt-0">
-              {isMobile ? (
-                // Mobile: Stack vertically
-                <div className="flex flex-col gap-4">
-                  <div className="h-[400px]">
-                    <GroupChat groupId={id!} />
-                  </div>
-                  <div>
-                    {renderNotesPanel()}
-                  </div>
+              <TabsContent value="chat" className="mt-0">
+                <div className="h-[calc(100vh-280px)] min-h-[400px]">
+                  <GroupChat groupId={id!} />
                 </div>
-              ) : (
-                // Desktop: Side by side with resizable panels
+              </TabsContent>
+
+              <TabsContent value="notes" className="mt-0">
+                {renderNotesPanel()}
+              </TabsContent>
+
+              <TabsContent value="members">
+                <div className="space-y-3">
+                  {members.map(member => {
+                    const isMemberCreator = member.id === group.created_by;
+                    return (
+                      <Card
+                        key={member.id}
+                        className={`p-4 ${isMemberCreator ? 'bg-indigo-50 dark:bg-indigo-950' : ''
+                          }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarFallback className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white">
+                                {member.full_name?.charAt(0) || 'U'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{member.full_name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {member.email}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {isMemberCreator && (
+                              <Badge className="bg-indigo-600 text-white">Admin</Badge>
+                            )}
+                            {isCreator && !isMemberCreator && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveMember(member.email)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <UserX className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </TabsContent>
+            </Tabs>
+          ) : (
+            // Desktop: Keep the original split layout with Chat & Notes side by side
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'split' | 'members')} className="w-full">
+              <TabsList className="mb-6">
+                <TabsTrigger value="split">Chat & Notes</TabsTrigger>
+                <TabsTrigger value="members">Members</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="split" className="mt-0">
                 <ResizablePanelGroup direction="horizontal" className="min-h-[600px] rounded-lg border">
                   <ResizablePanel defaultSize={40} minSize={25}>
                     <div className="h-full">
@@ -440,56 +495,55 @@ export default function GroupPage() {
                     </div>
                   </ResizablePanel>
                 </ResizablePanelGroup>
-              )}
-            </TabsContent>
+              </TabsContent>
 
-            <TabsContent value="members">
-              <div className="space-y-3">
-                {members.map(member => {
-                  const isMemberCreator = member.id === group.created_by;
-                  return (
-                    <Card
-                      key={member.id}
-                      className={`p-4 ${
-                        isMemberCreator ? 'bg-indigo-50 dark:bg-indigo-950' : ''
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Avatar>
-                            <AvatarFallback className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white">
-                              {member.full_name?.charAt(0) || 'U'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{member.full_name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {member.email}
-                            </p>
+              <TabsContent value="members">
+                <div className="space-y-3">
+                  {members.map(member => {
+                    const isMemberCreator = member.id === group.created_by;
+                    return (
+                      <Card
+                        key={member.id}
+                        className={`p-4 ${isMemberCreator ? 'bg-indigo-50 dark:bg-indigo-950' : ''
+                          }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarFallback className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white">
+                                {member.full_name?.charAt(0) || 'U'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{member.full_name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {member.email}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {isMemberCreator && (
+                              <Badge className="bg-indigo-600 text-white">Admin</Badge>
+                            )}
+                            {isCreator && !isMemberCreator && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveMember(member.email)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <UserX className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {isMemberCreator && (
-                            <Badge className="bg-indigo-600 text-white">Admin</Badge>
-                          )}
-                          {isCreator && !isMemberCreator && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleRemoveMember(member.email)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <UserX className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-            </TabsContent>
-          </Tabs>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </TabsContent>
+            </Tabs>
+          )}
         </div>
       </div>
 

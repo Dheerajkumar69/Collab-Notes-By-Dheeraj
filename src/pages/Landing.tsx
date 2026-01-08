@@ -41,17 +41,17 @@ export default function Landing() {
     },
     {
       icon: Bell,
-      title: 'Smart Notifications',
-      description: 'Stay updated with real-time notifications for all group activities.',
+      title: 'Real-time Sync',
+      description: 'See changes instantly as your team collaborates on shared notes.',
       gradient: 'from-indigo-500 to-violet-500',
     },
   ];
 
   const stats = [
-    { value: '10K+', label: 'Active Users' },
-    { value: '50K+', label: 'Notes Created' },
-    { value: '99.9%', label: 'Uptime' },
-    { value: '4.9', label: 'User Rating' },
+    { value: '∞', label: 'Free Forever' },
+    { value: '📝', label: 'Unlimited Notes' },
+    { value: '👥', label: 'Unlimited Groups' },
+    { value: '🔒', label: 'Secure & Private' },
   ];
 
   return (
@@ -66,7 +66,7 @@ export default function Landing() {
           className="fixed top-0 left-0 right-0 z-50 border-b bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60"
         >
           <div className="container flex h-16 items-center justify-between">
-            <motion.div 
+            <motion.div
               className="flex items-center gap-3"
               whileHover={{ scale: 1.05 }}
             >
@@ -305,28 +305,20 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* Social Proof */}
-        <section className="py-24">
+        {/* Open Source Badge */}
+        <section className="py-16">
           <div className="container">
             <FadeIn>
-              <div className="text-center mb-12">
-                <h2 className="text-2xl font-bold text-muted-foreground mb-8">
-                  Trusted by teams at
-                </h2>
-                <div className="flex flex-wrap justify-center items-center gap-12 opacity-50">
-                  {['Google', 'Microsoft', 'Apple', 'Amazon', 'Meta'].map((company, i) => (
-                    <motion.div
-                      key={company}
-                      className="text-2xl font-bold"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 0.5, y: 0 }}
-                      transition={{ delay: i * 0.1 }}
-                      whileHover={{ opacity: 1, scale: 1.1 }}
-                    >
-                      {company}
-                    </motion.div>
-                  ))}
-                </div>
+              <div className="text-center">
+                <motion.div
+                  className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-muted/50 border border-border"
+                  whileHover={{ scale: 1.05 }}
+                >
+                  <Heart className="h-5 w-5 text-red-500 fill-red-500" />
+                  <span className="text-muted-foreground">
+                    Built with love for teams who value simplicity
+                  </span>
+                </motion.div>
               </div>
             </FadeIn>
           </div>
