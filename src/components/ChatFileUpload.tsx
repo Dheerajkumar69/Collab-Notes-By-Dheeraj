@@ -151,6 +151,7 @@ export const ChatFileUpload = ({
         accept="image/*,.pdf,.doc,.docx,.txt,.xls,.xlsx"
       />
       <Button
+        type="button"
         variant="ghost"
         size="icon"
         onClick={() => fileInputRef.current?.click()}
@@ -203,11 +204,10 @@ export const ChatAttachmentPreview = ({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className={`flex items-center gap-2 p-2 rounded-lg ${
-                isOwnMessage
+              className={`flex items-center gap-2 p-2 rounded-lg ${isOwnMessage
                   ? 'bg-white/10 hover:bg-white/20'
                   : 'bg-background/50 hover:bg-background/70'
-              } transition-colors`}
+                } transition-colors`}
             >
               {getFileIcon(attachment.type)}
               <span className="text-xs truncate max-w-[150px]">{attachment.name}</span>
