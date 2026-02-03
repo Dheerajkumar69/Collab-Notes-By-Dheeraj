@@ -5,12 +5,17 @@ interface ShortcutHandlers {
     onNewNote?: () => void;
     onSearch?: () => void;
     onCreateGroup?: () => void;
+    onOpenCommandPalette?: () => void;
 }
 
 /**
  * Global keyboard shortcuts hook
+ * - Ctrl/Cmd + K: Open command palette / Focus search
  * - Ctrl/Cmd + N: New note (when onNewNote provided) or navigate to Dashboard
- * - Ctrl/Cmd + K: Focus search
+ * - / : Open command palette (when not in input)
+ * - Ctrl/Cmd + H: Go to Dashboard
+ * - Ctrl/Cmd + Shift + P: Go to Profile
+ * - Shift + ?: Open Help
  * - Escape: Close dialogs/modals
  */
 export function useKeyboardShortcuts(handlers: ShortcutHandlers = {}) {
@@ -24,6 +29,56 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers = {}) {
             target.tagName === 'TEXTAREA' ||
             target.isContentEditable;
 
+        // Ctrl/Cmd + K: Open command palette or focus search
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            if (handlers.onOpenCommandPalette) {
+                handlers.onOpenCommandPalette();
+            } else if (handlers.onSearch) {
+                handlers.onSearch();
+            } else {
+                // Try to focus the search input on the page
+                const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
+                if (searchInput) {
+                    searchInput.focus();
+                    searchInput.select();
+                }
+            }
+            return;
+        }
+
+        // "/" key to open command palette (when not typing)
+        if (e.key === '/' && !isTyping) {
+            e.preventDefault();
+            if (handlers.onOpenCommandPalette) {
+                handlers.onOpenCommandPalette();
+            }
+            return;
+        }
+
+        // Ctrl/Cmd + H: Go to Dashboard
+        if ((e.ctrlKey || e.metaKey) && e.key === 'h' && !e.shiftKey) {
+            e.preventDefault();
+            navigate('/dashboard');
+            return;
+        }
+
+        // Ctrl/Cmd + Shift + P: Go to Profile
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+            e.preventDefault();
+            navigate('/profile');
+            return;
+        }
+
+        // Shift + ?: Open Help
+        if (e.shiftKey && e.key === '?') {
+            if (!isTyping) {
+                e.preventDefault();
+                navigate('/help');
+            }
+            return;
+        }
+
         // Ctrl/Cmd + N: New note or navigate to dashboard
         if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
             e.preventDefault();
@@ -33,22 +88,6 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers = {}) {
                 handlers.onCreateGroup();
             } else {
                 navigate('/dashboard');
-            }
-            return;
-        }
-
-        // Ctrl/Cmd + K: Focus search
-        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-            e.preventDefault();
-            if (handlers.onSearch) {
-                handlers.onSearch();
-            } else {
-                // Try to focus the search input on the page
-                const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
-                if (searchInput) {
-                    searchInput.focus();
-                    searchInput.select();
-                }
             }
             return;
         }
@@ -77,10 +116,10 @@ export function KeyboardShortcutsHint() {
     return (
         <div className="text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 text-[10px] font-semibold bg-muted border border-border rounded">Ctrl</kbd>
+                <kbd className="px-1.5 py-0.5 text-[10px] font-semibold bg-muted border border-border rounded">⌘</kbd>
                 <span>+</span>
                 <kbd className="px-1.5 py-0.5 text-[10px] font-semibold bg-muted border border-border rounded">K</kbd>
-                <span className="ml-1">to search</span>
+                <span className="ml-1">to open commands</span>
             </span>
         </div>
     );
