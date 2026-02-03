@@ -11,6 +11,7 @@ import { JoinGroupDialog } from '@/components/JoinGroupDialog';
 import { FeedbackDialog } from '@/components/FeedbackDialog';
 import { ExportNotesDialog } from '@/components/ExportNotesDialog';
 import { ArchivedNotesSection } from '@/components/ArchivedNotesSection';
+import { CommandPalette } from '@/components/CommandPalette';
 import { useGroups, useProfile, useStats } from '@/hooks/supabase-hooks';
 import { useRealtimeGroups } from '@/hooks/useRealtimeSubscription';
 import { ErrorState } from '@/components/ErrorState';
@@ -35,14 +36,16 @@ export default function Dashboard() {
   const [sortBy, setSortBy] = useState('newest');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const GROUPS_PER_PAGE = 9;
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts with command palette
   useKeyboardShortcuts({
     onCreateGroup: () => setCreateDialogOpen(true),
     onSearch: () => searchInputRef.current?.focus(),
+    onOpenCommandPalette: () => setCommandPaletteOpen(true),
   });
 
   const getColorClass = (color: string) => {
@@ -145,6 +148,7 @@ export default function Dashboard() {
               </motion.div>
               <ExportNotesDialog />
               <FeedbackDialog />
+              <KeyboardShortcutsHint />
             </div>
           </div>
         </FadeIn>
@@ -389,6 +393,11 @@ export default function Dashboard() {
 
       <CreateGroupDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} onSuccess={() => { }} />
       <JoinGroupDialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen} onSuccess={() => { }} />
+      <CommandPalette
+        open={commandPaletteOpen}
+        onOpenChange={setCommandPaletteOpen}
+        onCreateGroup={() => setCreateDialogOpen(true)}
+      />
     </Layout>
   );
 }
