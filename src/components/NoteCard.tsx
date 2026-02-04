@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +27,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { MoreVertical, Pin, Edit, Trash2, Smile, Archive, ArchiveRestore, Loader2 } from 'lucide-react';
+import { MoreVertical, Pin, Edit, Trash2, Smile, Archive, ArchiveRestore, Loader2, Hash } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { NoteViewDialog } from './NoteViewDialog';
 import { EditRequestDialog } from './EditRequestDialog';
@@ -64,6 +65,8 @@ interface NoteCardNote {
   author_name?: string | null;
   created_by: string;
   group_id?: string;
+  lecture_number?: number | null;
+  topic?: string | null;
 }
 
 interface NoteCardProps {
@@ -213,6 +216,24 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
             alt="Note preview"
             className="w-full h-32 object-cover rounded-lg mb-3"
           />
+        )}
+
+        {/* Lecture & Topic badges */}
+        {(note.lecture_number || note.topic) && (
+          <div className="flex gap-2 flex-wrap mb-2">
+            {note.lecture_number && (
+              <Badge variant="outline" className="text-xs gap-1 bg-primary/10 border-primary/30">
+                <Hash className="h-3 w-3" />
+                Lecture {note.lecture_number}
+              </Badge>
+            )}
+            {note.topic && (
+              <Badge variant="outline" className="text-xs gap-1 bg-secondary">
+                <BookOpen className="h-3 w-3" />
+                {note.topic}
+              </Badge>
+            )}
+          </div>
         )}
 
         <h3 className="font-semibold text-lg mb-2 line-clamp-2">{note.title}</h3>

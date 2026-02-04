@@ -122,6 +122,7 @@ export default function GroupPage() {
         .select('*')
         .eq('group_id', id)
         .order('is_pinned', { ascending: false })
+        .order('lecture_number', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: false });
 
       if (error) throw error;

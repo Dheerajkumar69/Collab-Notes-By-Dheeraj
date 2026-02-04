@@ -157,10 +157,12 @@ export type Database = {
           is_archived: boolean | null
           is_pinned: boolean | null
           labels: string[] | null
+          lecture_number: number | null
           reactions: Json | null
           telegram_file_id: string | null
           telegram_message_id: string | null
           title: string
+          topic: string | null
           updated_at: string | null
         }
         Insert: {
@@ -176,10 +178,12 @@ export type Database = {
           is_archived?: boolean | null
           is_pinned?: boolean | null
           labels?: string[] | null
+          lecture_number?: number | null
           reactions?: Json | null
           telegram_file_id?: string | null
           telegram_message_id?: string | null
           title: string
+          topic?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -195,10 +199,12 @@ export type Database = {
           is_archived?: boolean | null
           is_pinned?: boolean | null
           labels?: string[] | null
+          lecture_number?: number | null
           reactions?: Json | null
           telegram_file_id?: string | null
           telegram_message_id?: string | null
           title?: string
+          topic?: string | null
           updated_at?: string | null
         }
         Relationships: [
