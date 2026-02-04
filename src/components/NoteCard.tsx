@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
@@ -79,6 +80,7 @@ interface NoteCardProps {
 
 export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [showEditRequest, setShowEditRequest] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -87,6 +89,14 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
   const { archiveNote, unarchiveNote, deleteFromTelegram } = useTelegramSync();
 
   const canEdit = note.created_by === user?.id;
+
+  const handleOpenNote = () => {
+    if (note.group_id) {
+      navigate(`/group/${note.group_id}/note/${note.id}`);
+    } else {
+      setShowViewDialog(true);
+    }
+  };
 
   const handleTogglePin = async () => {
     try {
@@ -197,7 +207,7 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
     <>
       <Card
         className={`${getBgColor()} p-4 hover:shadow-lg transition-shadow cursor-pointer group relative ${note.is_archived ? 'opacity-70' : ''}`}
-        onClick={() => setShowViewDialog(true)}
+        onClick={handleOpenNote}
       >
         {note.is_pinned && (
           <Pin className="absolute top-2 right-2 h-4 w-4 text-primary" />

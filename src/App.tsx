@@ -12,6 +12,7 @@ import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import GroupPage from "./pages/GroupPage";
+import NotePage from "./pages/NotePage";
 import AllNotes from "./pages/AllNotes";
 import Admin from "./pages/Admin";
 import Profile from "./pages/Profile";
@@ -53,6 +54,7 @@ const App = () => (
                 <Route path="/help" element={<Help />} />
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/group/:id" element={<ProtectedRoute><GroupPage /></ProtectedRoute>} />
+                <Route path="/group/:groupId/note/:noteId" element={<ProtectedRoute><NotePage /></ProtectedRoute>} />
                 <Route path="/all-notes" element={<ProtectedRoute><AllNotes /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
