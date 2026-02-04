@@ -52,6 +52,8 @@ export function CreateNoteDialog({
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [lectureNumber, setLectureNumber] = useState<number | ''>('');
+  const [topic, setTopic] = useState('');
 
   useEffect(() => {
     if (editingNote) {
@@ -59,6 +61,8 @@ export function CreateNoteDialog({
       setContent(editingNote.content || '');
       setLabels(editingNote.labels || []);
       setColor(editingNote.color || 'white');
+      setLectureNumber(editingNote.lecture_number || '');
+      setTopic(editingNote.topic || '');
     } else {
       resetForm();
     }
@@ -71,6 +75,8 @@ export function CreateNoteDialog({
     setNewLabel('');
     setColor('white');
     setFiles([]);
+    setLectureNumber('');
+    setTopic('');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -201,6 +207,8 @@ export function CreateNoteDialog({
         attachments,
         author_name: profile?.full_name || 'User',
         created_by: user?.id,
+        lecture_number: lectureNumber === '' ? null : lectureNumber,
+        topic: topic.trim() || null,
       };
 
       if (editingNote) {
@@ -261,6 +269,28 @@ export function CreateNoteDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Lecture & Topic Row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Lecture #</Label>
+              <Input
+                type="number"
+                min={1}
+                value={lectureNumber}
+                onChange={e => setLectureNumber(e.target.value === '' ? '' : parseInt(e.target.value))}
+                placeholder="e.g. 1, 2, 3..."
+              />
+            </div>
+            <div>
+              <Label>Topic</Label>
+              <Input
+                value={topic}
+                onChange={e => setTopic(e.target.value)}
+                placeholder="e.g. Introduction, Arrays..."
+              />
+            </div>
+          </div>
+
           <div>
             <Label>Title *</Label>
             <Input
