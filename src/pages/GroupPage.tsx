@@ -51,13 +51,14 @@ interface Note {
   author_name?: string | null;
   attachments?: any;
   is_pinned?: boolean;
+  is_archived?: boolean;
   color?: string | null;
   edit_requests?: any;
   reactions?: any;
   created_by: string;
   created_at: string;
-   lecture_number?: number | null;
-   topic?: string | null;
+  lecture_number?: number | null;
+  topic?: string | null;
 }
 
 interface Profile {
@@ -216,6 +217,7 @@ export default function GroupPage() {
   );
 
   const filteredNotes = notes.filter(note => {
+    if (note.is_archived) return false; // Hide archived notes
     const matchesSearch =
       note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       note.content?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -400,15 +402,17 @@ export default function GroupPage() {
               <Badge variant="secondary" className="bg-white/20 text-white border-0">
                 {notes.length} {notes.length === 1 ? 'note' : 'notes'}
               </Badge>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={copyInviteCode}
-                className="text-white hover:bg-white/20 h-7 px-3"
-              >
-                <Copy className="h-3 w-3 mr-1" />
-                {group.invite_code}
-              </Button>
+              {isCreator && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={copyInviteCode}
+                  className="text-white hover:bg-white/20 h-7 px-3"
+                >
+                  <Copy className="h-3 w-3 mr-1" />
+                  {group.invite_code}
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -453,9 +457,11 @@ export default function GroupPage() {
                             </Avatar>
                             <div>
                               <p className="font-medium">{member.full_name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {member.email}
-                              </p>
+                              {isCreator && (
+                                <p className="text-sm text-muted-foreground">
+                                  {member.email}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -523,9 +529,11 @@ export default function GroupPage() {
                             </Avatar>
                             <div>
                               <p className="font-medium">{member.full_name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {member.email}
-                              </p>
+                              {isCreator && (
+                                <p className="text-sm text-muted-foreground">
+                                  {member.email}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-2">

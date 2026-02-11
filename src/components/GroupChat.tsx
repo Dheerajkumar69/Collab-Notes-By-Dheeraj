@@ -174,7 +174,7 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
 
       if (error) throw error;
 
-      // Notify other group members
+      // Notify other group members using RPC function
       try {
         const { data: group } = await supabase
           .from('groups')
@@ -191,13 +191,12 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
 
           const otherMembers = profiles?.filter(p => p.id !== user.id) || [];
 
-          // Create notifications for each member
+          // Create notifications using RPC (bypasses RLS)
           for (const member of otherMembers) {
-            await supabase.from('notifications').insert({
-              user_id: member.id,
-              message: `💬 ${userName} sent a message in ${group.name}`,
-              link: `/group/${groupId}`,
-              is_read: false,
+            await supabase.rpc('create_notification', {
+              p_user_id: member.id,
+              p_message: `💬 ${userName} sent a message in ${group.name}`,
+              p_link: `/group/${groupId}`,
             });
           }
         }

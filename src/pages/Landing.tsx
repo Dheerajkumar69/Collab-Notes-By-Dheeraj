@@ -389,7 +389,7 @@ export default function Landing() {
               <div className="flex items-center gap-3">
                 <img src={logo} alt="CollabNotes" className="h-8 w-8 rounded-full object-cover" />
                 <span className="text-sm text-muted-foreground">
-                  © 2025 CollabNotes. Made with <Heart className="h-4 w-4 inline text-red-500 fill-red-500" /> for teams everywhere.
+                  © {new Date().getFullYear()} CollabNotes. Made with <Heart className="h-4 w-4 inline text-red-500 fill-red-500" /> for teams everywhere.
                 </span>
               </div>
               <div className="flex gap-8 text-sm">

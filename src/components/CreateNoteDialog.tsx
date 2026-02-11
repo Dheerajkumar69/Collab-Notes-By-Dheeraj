@@ -142,47 +142,17 @@ export function CreateNoteDialog({
         const uploadedFiles = await Promise.all(uploadPromises);
         attachments = [...attachments, ...uploadedFiles];
 
-        // OCR for images
+        // OCR for images using edge function
         setProcessing(true);
         for (const file of uploadedFiles) {
           if (file.type.startsWith('image/')) {
             try {
-              const response = await fetch(
-                'https://api.openai.com/v1/chat/completions',
-                {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
-                  },
-                  body: JSON.stringify({
-                    model: 'gpt-4o-mini',
-                    messages: [
-                      {
-                        role: 'user',
-                        content: [
-                          {
-                            type: 'text',
-                            text: 'Extract all text from this image. Return only the extracted text, nothing else.',
-                          },
-                          {
-                            type: 'image_url',
-                            image_url: { url: file.url },
-                          },
-                        ],
-                      },
-                    ],
-                    max_tokens: 1000,
-                  }),
-                }
-              );
+              const { data: ocrData, error: ocrError } = await supabase.functions.invoke('ocr-extract', {
+                body: { imageUrl: file.url },
+              });
 
-              if (response.ok) {
-                const data = await response.json();
-                const extractedText = data.choices[0]?.message?.content || '';
-                if (extractedText) {
-                  setContent(prev => prev + '\n\n' + extractedText);
-                }
+              if (!ocrError && ocrData?.extractedText) {
+                setContent(prev => prev + '\n\n' + ocrData.extractedText);
               }
             } catch (error) {
               console.error('OCR error:', error);
