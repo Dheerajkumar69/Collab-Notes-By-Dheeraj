@@ -2,14 +2,19 @@ import { z } from 'zod';
 
 // Auth schemas
 export const signInSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z.string().trim().email('Invalid email address').max(255, 'Email too long'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
 export const signUpSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  fullName: z.string().min(1, 'Full name is required'),
+  email: z.string().trim().email('Invalid email address').max(255, 'Email too long'),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(128, 'Password must be less than 128 characters')
+    .regex(/[a-z]/, 'Password must contain a lowercase letter')
+    .regex(/[A-Z]/, 'Password must contain an uppercase letter')
+    .regex(/[0-9]/, 'Password must contain a number'),
+  fullName: z.string().trim().min(1, 'Full name is required').max(100, 'Name too long'),
 });
 
 // Group schemas

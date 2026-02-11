@@ -8,12 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, KeyRound } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { updateProfileSchema, UpdateProfileFormData } from '@/lib/validation';
 import { SEOHead } from '@/components/SEOHead';
 import { AvatarUpload } from '@/components/AvatarUpload';
+import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
+import { ChangePasswordCard } from '@/components/ChangePasswordCard';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -196,10 +198,12 @@ export default function Profile() {
           </CardContent>
         </Card>
 
+        <ChangePasswordCard />
+
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Account Security</CardTitle>
-            <CardDescription>Manage your account security settings</CardDescription>
+            <CardTitle>Account</CardTitle>
+            <CardDescription>Manage your session</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
