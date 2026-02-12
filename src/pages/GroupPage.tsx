@@ -17,9 +17,9 @@ import { NoteCard } from '@/components/NoteCard';
 import { EditRequestsPanel } from '@/components/EditRequestsPanel';
 import { GroupChat } from '@/components/GroupChat';
 import { useRealtimeNotes } from '@/hooks/useRealtimeSubscription';
-
 import { useIsMobile } from '@/hooks/use-mobile';
- import { QuickNoteInput } from '@/components/QuickNoteInput';
+import { QuickNoteInput } from '@/components/QuickNoteInput';
+import { FolderTree } from '@/components/FolderTree';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -82,7 +82,7 @@ export default function GroupPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
-  
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
 
   // Enable realtime updates for notes in this group
   useRealtimeNotes(id);
@@ -217,14 +217,26 @@ export default function GroupPage() {
   );
 
   const filteredNotes = notes.filter(note => {
-    if (note.is_archived) return false; // Hide archived notes
+    if (note.is_archived) return false;
     const matchesSearch =
       note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       note.content?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesLabel =
       selectedLabel === 'All' || note.labels?.includes(selectedLabel);
-    return matchesSearch && matchesLabel;
+    const matchesFolder =
+      selectedFolderId === null || (note as any).folder_id === selectedFolderId;
+    return matchesSearch && matchesLabel && matchesFolder;
   });
+
+  // Compute note counts per folder
+  const noteCountByFolder: Record<string, number> = {};
+  notes.filter(n => !n.is_archived).forEach(note => {
+    const fid = (note as any).folder_id;
+    if (fid) {
+      noteCountByFolder[fid] = (noteCountByFolder[fid] || 0) + 1;
+    }
+  });
+  const totalUnfoldered = notes.filter(n => !n.is_archived).length;
 
   const getColorClass = (color?: string) => {
     switch (color) {
@@ -253,6 +265,19 @@ export default function GroupPage() {
 
        {/* Quick Note Input - Simple text-only notepad */}
        <QuickNoteInput groupId={id!} onSuccess={fetchNotes} />
+
+       {/* Folder Sidebar + Notes */}
+       <div className="flex gap-4 mb-6">
+         <div className="w-48 flex-shrink-0 hidden lg:block">
+           <FolderTree
+             groupId={id!}
+             selectedFolderId={selectedFolderId}
+             onSelectFolder={setSelectedFolderId}
+             noteCountByFolder={noteCountByFolder}
+             totalUnfoldered={totalUnfoldered}
+           />
+         </div>
+         <div className="flex-1">
 
        {/* Search & Filter */}
       <div className="mb-6 space-y-4">
@@ -325,6 +350,8 @@ export default function GroupPage() {
           </Button>
         </Card>
       )}
+    </div>
+    </div>
     </>
   );
 

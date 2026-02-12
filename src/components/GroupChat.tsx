@@ -17,6 +17,7 @@ import {
 import { TypingIndicator, useTypingIndicator } from './TypingIndicator';
 import { MessageReactions, AddReactionButton } from './MessageReactions';
 import { ChatFileUpload, ChatAttachmentPreview } from './ChatFileUpload';
+import { MentionInput } from './MentionInput';
 import type { Json } from '@/integrations/supabase/types';
 
 interface ChatAttachment {
@@ -59,6 +60,7 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
   const [sending, setSending] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<ChatAttachment[]>([]);
   const [userName, setUserName] = useState('');
+  const [mentionedUsers, setMentionedUsers] = useState<{id: string; full_name: string}[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -148,9 +150,9 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewMessage(e.target.value);
-    if (e.target.value && userName) {
+  const handleInputChange = (newValue: string) => {
+    setNewMessage(newValue);
+    if (newValue && userName) {
       startTyping(userName);
     }
   };
@@ -174,6 +176,23 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
 
       if (error) throw error;
 
+      // Notify mentioned users specifically
+      if (mentionedUsers.length > 0) {
+        for (const mentioned of mentionedUsers) {
+          if (mentioned.id !== user.id) {
+            try {
+              await supabase.rpc('create_notification', {
+                p_user_id: mentioned.id,
+                p_message: `🔔 ${userName} mentioned you in a message`,
+                p_link: `/group/${groupId}`,
+              });
+            } catch (e) {
+              console.error(e);
+            }
+          }
+        }
+      }
+
       // Notify other group members using RPC function
       try {
         const { data: group } = await supabase
@@ -183,15 +202,14 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
           .single();
 
         if (group?.members) {
-          // Get user IDs for all members except sender
           const { data: profiles } = await supabase
             .from('profiles')
             .select('id, email')
             .in('email', group.members);
 
-          const otherMembers = profiles?.filter(p => p.id !== user.id) || [];
+          const mentionedIds = new Set(mentionedUsers.map(m => m.id));
+          const otherMembers = profiles?.filter(p => p.id !== user.id && !mentionedIds.has(p.id)) || [];
 
-          // Create notifications using RPC (bypasses RLS)
           for (const member of otherMembers) {
             await supabase.rpc('create_notification', {
               p_user_id: member.id,
@@ -201,13 +219,13 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
           }
         }
       } catch (notifyError) {
-        // Don't fail the message send if notifications fail
         console.error('Failed to send notifications:', notifyError);
       }
 
       setNewMessage('');
       setReplyingTo(null);
       setPendingFiles([]);
+      setMentionedUsers([]);
     } catch (error) {
       toast({
         title: 'Error',
@@ -505,14 +523,15 @@ export const GroupChat = ({ groupId }: GroupChatProps) => {
             onRemoveFile={(index) => setPendingFiles(prev => prev.filter((_, i) => i !== index))}
             disabled={sending}
           />
-          <Input
-            ref={inputRef}
-            placeholder="Type a message..."
+          <MentionInput
+            inputRef={inputRef as React.RefObject<HTMLInputElement>}
             value={newMessage}
             onChange={handleInputChange}
-            onBlur={stopTyping}
-            className="flex-1"
+            onMention={(user) => setMentionedUsers(prev => [...prev, { id: user.id, full_name: user.full_name }])}
+            groupId={groupId}
+            placeholder="Type a message... (use @ to mention)"
             disabled={sending}
+            onBlur={stopTyping}
           />
           <Button
             type="submit"

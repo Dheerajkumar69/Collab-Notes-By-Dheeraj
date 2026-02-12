@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { RichTextEditor } from '@/components/RichTextEditor';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
@@ -272,11 +273,10 @@ export function CreateNoteDialog({
 
           <div>
             <Label>Content</Label>
-            <Textarea
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              placeholder="Write your note... (Markdown supported)"
-              rows={8}
+            <RichTextEditor
+              content={content}
+              onChange={setContent}
+              placeholder="Write your note..."
             />
           </div>
 
