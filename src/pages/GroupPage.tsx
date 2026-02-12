@@ -17,7 +17,7 @@ import { NoteCard } from '@/components/NoteCard';
 import { EditRequestsPanel } from '@/components/EditRequestsPanel';
 import { GroupChat } from '@/components/GroupChat';
 import { useRealtimeNotes } from '@/hooks/useRealtimeSubscription';
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
+
 import { useIsMobile } from '@/hooks/use-mobile';
  import { QuickNoteInput } from '@/components/QuickNoteInput';
 import {
@@ -82,7 +82,7 @@ export default function GroupPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'split' | 'members'>('split');
+  
 
   // Enable realtime updates for notes in this group
   useRealtimeNotes(id);
@@ -487,27 +487,22 @@ export default function GroupPage() {
               </TabsContent>
             </Tabs>
           ) : (
-            // Desktop: Keep the original split layout with Chat & Notes side by side
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'split' | 'members')} className="w-full">
+            // Desktop: Separate tabs for Chat, Notes, and Members
+            <Tabs defaultValue="chat" className="w-full">
               <TabsList className="mb-6">
-                <TabsTrigger value="split">Chat & Notes</TabsTrigger>
-                <TabsTrigger value="members">Members</TabsTrigger>
+                <TabsTrigger value="chat">💬 Chat</TabsTrigger>
+                <TabsTrigger value="notes">📝 Notes</TabsTrigger>
+                <TabsTrigger value="members">👥 Members</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="split" className="mt-0">
-                <ResizablePanelGroup direction="horizontal" className="min-h-[600px] rounded-lg border">
-                  <ResizablePanel defaultSize={40} minSize={25}>
-                    <div className="h-full">
-                      <GroupChat groupId={id!} />
-                    </div>
-                  </ResizablePanel>
-                  <ResizableHandle withHandle />
-                  <ResizablePanel defaultSize={60} minSize={30}>
-                    <div className="h-full overflow-auto p-4">
-                      {renderNotesPanel()}
-                    </div>
-                  </ResizablePanel>
-                </ResizablePanelGroup>
+              <TabsContent value="chat" className="mt-0">
+                <div className="h-[calc(100vh-280px)] min-h-[500px] rounded-lg border">
+                  <GroupChat groupId={id!} />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="notes" className="mt-0">
+                {renderNotesPanel()}
               </TabsContent>
 
               <TabsContent value="members">
