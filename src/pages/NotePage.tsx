@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor, RichTextViewer } from '@/components/RichTextEditor';
+import { NoteVersionHistory } from '@/components/NoteVersionHistory';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { 
@@ -620,17 +622,38 @@ export default function NotePage() {
             </div>
           )}
 
-          {/* Content */}
+          {/* Version History & Content */}
+          {canEdit && (
+            <div className="flex justify-end mb-4">
+              <NoteVersionHistory
+                noteId={note.id}
+                currentTitle={note.title}
+                currentContent={note.content || ''}
+                onRestore={async (title, content) => {
+                  try {
+                    const { error } = await supabase
+                      .from('notes')
+                      .update({ title, content, updated_at: new Date().toISOString() })
+                      .eq('id', note.id);
+                    if (error) throw error;
+                    setNote({ ...note, title, content });
+                    setEditTitle(title);
+                    setEditContent(content);
+                  } catch (err) {
+                    toast({ title: 'Error', description: 'Failed to restore version', variant: 'destructive' });
+                  }
+                }}
+              />
+            </div>
+          )}
+
           <div className="min-h-[200px]">
             {isEditingContent && canEdit ? (
               <div className="space-y-3">
-                <Textarea
-                  ref={contentTextareaRef}
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  className="min-h-[300px] text-base resize-none"
-                  placeholder="Write your notes here... (Markdown supported)"
-                  autoFocus
+                <RichTextEditor
+                  content={editContent}
+                  onChange={setEditContent}
+                  placeholder="Write your notes here..."
                 />
                 <div className="flex gap-2">
                   <Button onClick={handleSaveContent} disabled={saving}>
@@ -650,11 +673,11 @@ export default function NotePage() {
               </div>
             ) : (
               <div 
-                className={`prose prose-lg dark:prose-invert max-w-none ${canEdit ? 'cursor-text hover:bg-muted/30 rounded-lg p-4 -m-4' : ''}`}
+                className={`${canEdit ? 'cursor-text hover:bg-muted/30 rounded-lg p-4 -m-4' : ''}`}
                 onClick={() => canEdit && setIsEditingContent(true)}
               >
                 {note.content ? (
-                  <ReactMarkdown>{note.content}</ReactMarkdown>
+                  <RichTextViewer content={note.content} />
                 ) : (
                   <p className="text-muted-foreground italic">
                     {canEdit ? 'Click to add content...' : 'No content yet.'}

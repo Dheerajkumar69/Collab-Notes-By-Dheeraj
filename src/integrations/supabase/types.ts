@@ -53,6 +53,54 @@ export type Database = {
         }
         Relationships: []
       }
+      folders: {
+        Row: {
+          color: string | null
+          created_at: string
+          created_by: string
+          group_id: string
+          id: string
+          name: string
+          parent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          created_by: string
+          group_id: string
+          id?: string
+          name: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          created_by?: string
+          group_id?: string
+          id?: string
+          name?: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "folders_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "folders_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       groups: {
         Row: {
           background_image_url: string | null
@@ -143,6 +191,44 @@ export type Database = {
           },
         ]
       }
+      note_versions: {
+        Row: {
+          content: string | null
+          created_at: string
+          created_by: string
+          id: string
+          note_id: string
+          title: string
+          version_number: number
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          note_id: string
+          title: string
+          version_number?: number
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          note_id?: string
+          title?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_versions_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notes: {
         Row: {
           attachments: Json | null
@@ -152,6 +238,7 @@ export type Database = {
           created_at: string | null
           created_by: string
           edit_requests: Json | null
+          folder_id: string | null
           group_id: string
           id: string
           is_archived: boolean | null
@@ -173,6 +260,7 @@ export type Database = {
           created_at?: string | null
           created_by: string
           edit_requests?: Json | null
+          folder_id?: string | null
           group_id: string
           id?: string
           is_archived?: boolean | null
@@ -194,6 +282,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string
           edit_requests?: Json | null
+          folder_id?: string | null
           group_id?: string
           id?: string
           is_archived?: boolean | null
@@ -208,6 +297,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "notes_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notes_group_id_fkey"
             columns: ["group_id"]

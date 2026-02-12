@@ -33,6 +33,7 @@ import { toast } from '@/hooks/use-toast';
 import { NoteViewDialog } from './NoteViewDialog';
 import { EditRequestDialog } from './EditRequestDialog';
 import ReactMarkdown from 'react-markdown';
+import { RichTextViewer } from './RichTextEditor';
 import { useDeleteNoteWithCleanup } from '@/hooks/useDeleteNoteWithCleanup';
 import { useTelegramSync } from '@/hooks/useTelegramSync';
 import { supabase } from '@/integrations/supabase/client';
@@ -249,8 +250,14 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
         <h3 className="font-semibold text-lg mb-2 line-clamp-2">{note.title}</h3>
 
         {note.content && !note.is_archived && (
-          <div className="text-muted-foreground text-sm mb-3 line-clamp-3 prose prose-sm dark:prose-invert max-w-none">
-            <ReactMarkdown>{note.content}</ReactMarkdown>
+          <div className="text-muted-foreground text-sm mb-3 line-clamp-3 max-w-none overflow-hidden">
+            {note.content.startsWith('<') ? (
+              <RichTextViewer content={note.content} className="prose-sm" />
+            ) : (
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <ReactMarkdown>{note.content}</ReactMarkdown>
+              </div>
+            )}
           </div>
         )}
         
