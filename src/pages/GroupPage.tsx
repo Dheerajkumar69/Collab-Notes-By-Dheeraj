@@ -323,12 +323,12 @@ export default function GroupPage() {
         )}
       </div>
 
-      {/* Notes Grid */}
+      {/* Notes Masonry/Bento Grid */}
       {filteredNotes.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 mb-8 [column-fill:_balance]">
           {filteredNotes.map(note => (
+            <div key={note.id} className="break-inside-avoid mb-4">
             <NoteCard
-              key={note.id}
               note={note}
               onUpdate={fetchNotes}
               onEdit={() => {
@@ -337,6 +337,7 @@ export default function GroupPage() {
               }}
               isCreator={isCreator}
             />
+            </div>
           ))}
         </div>
       ) : (
@@ -379,49 +380,53 @@ export default function GroupPage() {
     <Layout>
       <div className="min-h-screen">
         {/* Header */}
-        <div
-          className={`bg-gradient-to-br ${getColorClass(group.color)} text-white p-8 mb-6 rounded-xl`}
-          style={
-            group.background_image_url
-              ? {
-                backgroundImage: `url(${group.background_image_url})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-              }
-              : {}
-          }
-        >
-          <div className="max-w-4xl mx-auto">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h1 className="text-4xl font-bold mb-2">{group.name}</h1>
-                {group.description && (
-                  <p className="text-white/90">{group.description}</p>
-                )}
-              </div>
-              <div className="flex gap-2">
-                {isCreator && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setShowSettings(true)}
-                      className="text-white hover:bg-white/20"
-                    >
-                      <Settings className="h-5 w-5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setShowDeleteDialog(true)}
-                      className="text-white hover:bg-white/20"
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
+         <div
+           className={`bg-gradient-to-br ${getColorClass(group.color)} text-white p-8 mb-6 rounded-xl relative overflow-hidden`}
+           style={
+             group.background_image_url
+               ? {
+                 backgroundImage: `url(${group.background_image_url})`,
+                 backgroundSize: 'cover',
+                 backgroundPosition: 'center',
+               }
+               : {}
+           }
+         >
+           {/* Dark overlay for background images so buttons stay visible */}
+           {group.background_image_url && (
+             <div className="absolute inset-0 bg-black/40" />
+           )}
+           <div className="max-w-4xl mx-auto relative z-10">
+             <div className="flex items-start justify-between mb-4">
+               <div>
+                 <h1 className="text-4xl font-bold mb-2">{group.name}</h1>
+                 {group.description && (
+                   <p className="text-white/90">{group.description}</p>
+                 )}
+               </div>
+               <div className="flex gap-2">
+                 {isCreator && (
+                   <>
+                     <Button
+                       variant="ghost"
+                       size="icon"
+                       onClick={() => setShowSettings(true)}
+                       className="text-white hover:bg-white/20"
+                     >
+                       <Settings className="h-5 w-5" />
+                     </Button>
+                     <Button
+                       variant="ghost"
+                       size="icon"
+                       onClick={() => setShowDeleteDialog(true)}
+                       className="text-white hover:bg-white/20"
+                     >
+                       <Trash2 className="h-5 w-5" />
+                     </Button>
+                   </>
+                 )}
+               </div>
+             </div>
             <div className="flex gap-4 text-sm">
               <Badge variant="secondary" className="bg-white/20 text-white border-0">
                 {members.length} {members.length === 1 ? 'member' : 'members'}
