@@ -29,12 +29,89 @@ interface TelegramResponse {
 
 const TELEGRAM_API = 'https://api.telegram.org/bot'
 
+async function authenticateRequest(req: Request, supabaseUrl: string, supabaseAnonKey: string): Promise<string> {
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    throw new Error('UNAUTHORIZED')
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } },
+  })
+
+  const token = authHeader.replace('Bearer ', '')
+  const { data, error } = await supabase.auth.getUser(token)
+  if (error || !data?.user) {
+    throw new Error('UNAUTHORIZED')
+  }
+
+  return data.user.id
+}
+
+async function verifyNoteAccess(
+  supabase: ReturnType<typeof createClient>,
+  noteId: string,
+  userId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('notes')
+    .select('group_id')
+    .eq('id', noteId)
+    .single()
+
+  if (!data) return false
+
+  const { data: group } = await supabase
+    .from('groups')
+    .select('created_by, members')
+    .eq('id', data.group_id)
+    .single()
+
+  if (!group) return false
+
+  if (group.created_by === userId) return true
+
+  // Get user email to check membership
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('id', userId)
+    .single()
+
+  if (!profile) return false
+
+  return (group.members || []).includes(profile.email)
+}
+
+async function verifyGroupAccess(
+  supabase: ReturnType<typeof createClient>,
+  groupId: string,
+  userId: string
+): Promise<boolean> {
+  const { data: group } = await supabase
+    .from('groups')
+    .select('created_by, members')
+    .eq('id', groupId)
+    .single()
+
+  if (!group) return false
+  if (group.created_by === userId) return true
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('id', userId)
+    .single()
+
+  if (!profile) return false
+  return (group.members || []).includes(profile.email)
+}
+
 async function sendToTelegram(
   botToken: string,
   channelId: string,
   note: NotePayload
 ): Promise<{ messageId: string; fileId?: string }> {
-  // Create note metadata message
   const metadata = {
     note_id: note.id,
     title: note.title,
@@ -48,7 +125,6 @@ async function sendToTelegram(
     attachment_count: note.attachments?.length || 0,
   }
 
-  // Send metadata as a message
   const metadataResponse = await fetch(`${TELEGRAM_API}${botToken}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -65,7 +141,7 @@ async function sendToTelegram(
   })
 
   const metadataResult: TelegramResponse = await metadataResponse.json()
-  
+
   if (!metadataResult.ok) {
     throw new Error(`Telegram API error: ${metadataResult.description}`)
   }
@@ -73,7 +149,6 @@ async function sendToTelegram(
   const messageId = metadataResult.result!.message_id.toString()
   let fileId: string | undefined
 
-  // If note has content, send it as a document
   if (note.content) {
     const contentBlob = new Blob([note.content], { type: 'text/markdown' })
     const formData = new FormData()
@@ -88,16 +163,15 @@ async function sendToTelegram(
     })
 
     const contentResult: TelegramResponse = await contentResponse.json()
-    
+
     if (contentResult.ok && contentResult.result?.document) {
       fileId = contentResult.result.document.file_id
     }
   }
 
-  // Handle attachments - send info about them
   if (note.attachments && note.attachments.length > 0) {
     const attachmentInfo = note.attachments.map(a => `• ${a.name} (${a.type}): ${a.url}`).join('\n')
-    
+
     await fetch(`${TELEGRAM_API}${botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -116,20 +190,17 @@ async function getFromTelegram(
   botToken: string,
   fileId: string
 ): Promise<string> {
-  // Get file path
   const fileResponse = await fetch(`${TELEGRAM_API}${botToken}/getFile?file_id=${fileId}`)
   const fileResult = await fileResponse.json()
-  
+
   if (!fileResult.ok) {
     throw new Error(`Failed to get file: ${fileResult.description}`)
   }
 
   const filePath = fileResult.result.file_path
-  
-  // Download file content
   const downloadUrl = `https://api.telegram.org/file/bot${botToken}/${filePath}`
   const contentResponse = await fetch(downloadUrl)
-  
+
   return await contentResponse.text()
 }
 
@@ -152,7 +223,6 @@ async function deleteFromTelegram(
 }
 
 Deno.serve(async (req) => {
-  // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -161,26 +231,49 @@ Deno.serve(async (req) => {
     const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')
     const channelId = Deno.env.get('TELEGRAM_CHANNEL_ID')
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
     if (!botToken || !channelId) {
       throw new Error('Telegram credentials not configured')
     }
 
+    // Authenticate the caller
+    let userId: string
+    try {
+      userId = await authenticateRequest(req.clone(), supabaseUrl, supabaseAnonKey)
+    } catch {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Use service role client for DB operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    
+    // Use anon client for access checks (respects RLS)
+    const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: req.headers.get('Authorization')! } },
+    })
+
     const { action, note, noteId, fileId } = await req.json()
 
-    console.log(`Telegram sync action: ${action}`)
+    console.log(`Telegram sync action: ${action} by user: ${userId}`)
 
     switch (action) {
       case 'sync': {
-        // Sync a note to Telegram
         if (!note) throw new Error('Note data required for sync')
-        
+
+        // Verify user has access to the note's group
+        if (!(await verifyGroupAccess(anonClient, note.group_id, userId))) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Access denied' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
         const { messageId, fileId: newFileId } = await sendToTelegram(botToken, channelId, note)
-        
-        // Update note with Telegram IDs
+
         const { error } = await supabase
           .from('notes')
           .update({
@@ -191,8 +284,6 @@ Deno.serve(async (req) => {
 
         if (error) throw error
 
-        console.log(`Note ${note.id} synced to Telegram: message ${messageId}`)
-        
         return new Response(
           JSON.stringify({ success: true, messageId, fileId: newFileId }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -200,11 +291,10 @@ Deno.serve(async (req) => {
       }
 
       case 'retrieve': {
-        // Retrieve content from Telegram
         if (!fileId) throw new Error('File ID required for retrieval')
-        
+
         const content = await getFromTelegram(botToken, fileId)
-        
+
         return new Response(
           JSON.stringify({ success: true, content }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -212,10 +302,15 @@ Deno.serve(async (req) => {
       }
 
       case 'archive': {
-        // Archive a note - sync to Telegram and mark as archived
         if (!noteId) throw new Error('Note ID required for archive')
-        
-        // Get the note data
+
+        if (!(await verifyNoteAccess(anonClient, noteId, userId))) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Access denied' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
         const { data: noteData, error: fetchError } = await supabase
           .from('notes')
           .select('*')
@@ -224,7 +319,6 @@ Deno.serve(async (req) => {
 
         if (fetchError || !noteData) throw new Error('Note not found')
 
-        // Sync to Telegram if not already synced
         let messageId = noteData.telegram_message_id
         let telegramFileId = noteData.telegram_file_id
 
@@ -234,21 +328,18 @@ Deno.serve(async (req) => {
           telegramFileId = syncResult.fileId
         }
 
-        // Mark as archived and clear content to save space
         const { error: updateError } = await supabase
           .from('notes')
           .update({
             telegram_message_id: messageId,
             telegram_file_id: telegramFileId,
             is_archived: true,
-            content: null, // Clear content to save Supabase space
+            content: null,
           })
           .eq('id', noteId)
 
         if (updateError) throw updateError
 
-        console.log(`Note ${noteId} archived to Telegram`)
-        
         return new Response(
           JSON.stringify({ success: true, archived: true }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -256,10 +347,15 @@ Deno.serve(async (req) => {
       }
 
       case 'unarchive': {
-        // Restore note content from Telegram
         if (!noteId) throw new Error('Note ID required for unarchive')
-        
-        // Get note with file ID
+
+        if (!(await verifyNoteAccess(anonClient, noteId, userId))) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Access denied' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
         const { data: noteData, error: fetchError } = await supabase
           .from('notes')
           .select('telegram_file_id')
@@ -267,15 +363,13 @@ Deno.serve(async (req) => {
           .single()
 
         if (fetchError || !noteData) throw new Error('Note not found')
-        
+
         if (!noteData.telegram_file_id) {
           throw new Error('No Telegram file ID - content cannot be restored')
         }
 
-        // Get content from Telegram
         const content = await getFromTelegram(botToken, noteData.telegram_file_id)
 
-        // Restore to Supabase
         const { error: updateError } = await supabase
           .from('notes')
           .update({
@@ -286,8 +380,6 @@ Deno.serve(async (req) => {
 
         if (updateError) throw updateError
 
-        console.log(`Note ${noteId} unarchived from Telegram`)
-        
         return new Response(
           JSON.stringify({ success: true, content }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -295,7 +387,15 @@ Deno.serve(async (req) => {
       }
 
       case 'delete': {
-        // Delete note from Telegram
+        if (!noteId) throw new Error('Note ID required')
+
+        if (!(await verifyNoteAccess(anonClient, noteId, userId))) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Access denied' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
         const { data: noteData } = await supabase
           .from('notes')
           .select('telegram_message_id')
@@ -305,7 +405,7 @@ Deno.serve(async (req) => {
         if (noteData?.telegram_message_id) {
           await deleteFromTelegram(botToken, channelId, noteData.telegram_message_id)
         }
-        
+
         return new Response(
           JSON.stringify({ success: true }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -313,12 +413,13 @@ Deno.serve(async (req) => {
       }
 
       case 'bulk-sync': {
-        // Sync all existing notes to Telegram
+        // Only allow bulk-sync for the user's own notes
         const { data: notes, error: fetchError } = await supabase
           .from('notes')
           .select('*')
+          .eq('created_by', userId)
           .is('telegram_message_id', null)
-          .limit(50) // Process in batches
+          .limit(50)
 
         if (fetchError) throw fetchError
 
@@ -326,7 +427,7 @@ Deno.serve(async (req) => {
         for (const n of notes || []) {
           try {
             const { messageId, fileId: newFileId } = await sendToTelegram(botToken, channelId, n as NotePayload)
-            
+
             await supabase
               .from('notes')
               .update({
@@ -334,17 +435,14 @@ Deno.serve(async (req) => {
                 telegram_file_id: newFileId || null,
               })
               .eq('id', n.id)
-            
+
             synced++
-            // Rate limit to avoid Telegram API limits
             await new Promise(resolve => setTimeout(resolve, 100))
           } catch (e) {
             console.error(`Failed to sync note ${n.id}:`, e)
           }
         }
 
-        console.log(`Bulk synced ${synced} notes to Telegram`)
-        
         return new Response(
           JSON.stringify({ success: true, synced, total: notes?.length || 0 }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -352,13 +450,14 @@ Deno.serve(async (req) => {
       }
 
       case 'auto-archive': {
-        // Archive notes older than 30 days
+        // Only auto-archive the user's own notes
         const thirtyDaysAgo = new Date()
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
         const { data: oldNotes, error: fetchError } = await supabase
           .from('notes')
           .select('*')
+          .eq('created_by', userId)
           .eq('is_archived', false)
           .lt('created_at', thirtyDaysAgo.toISOString())
           .limit(20)
@@ -368,7 +467,6 @@ Deno.serve(async (req) => {
         let archived = 0
         for (const n of oldNotes || []) {
           try {
-            // Sync to Telegram if not synced
             let messageId = n.telegram_message_id
             let telegramFileId = n.telegram_file_id
 
@@ -378,7 +476,6 @@ Deno.serve(async (req) => {
               telegramFileId = syncResult.fileId
             }
 
-            // Archive
             await supabase
               .from('notes')
               .update({
@@ -396,8 +493,6 @@ Deno.serve(async (req) => {
           }
         }
 
-        console.log(`Auto-archived ${archived} old notes`)
-        
         return new Response(
           JSON.stringify({ success: true, archived }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -411,7 +506,7 @@ Deno.serve(async (req) => {
     console.error('Telegram sync error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return new Response(
-      JSON.stringify({ success: false, error: errorMessage }),
+      JSON.stringify({ success: false, error: 'An error occurred' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
