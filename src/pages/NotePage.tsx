@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,7 +6,6 @@ import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { RichTextEditor, RichTextViewer } from '@/components/RichTextEditor';
 import { NoteVersionHistory } from '@/components/NoteVersionHistory';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -28,11 +27,11 @@ import {
   Hash,
   BookOpen,
   Save,
-  X
+  X,
+  Pencil
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import ReactMarkdown from 'react-markdown';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -110,9 +109,9 @@ export default function NotePage() {
   const [showAddLabel, setShowAddLabel] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
   const titleInputRef = useRef<HTMLInputElement>(null);
-  const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
   const { deleteNoteWithCleanup } = useDeleteNoteWithCleanup();
   
   const canEdit = note?.created_by === user?.id;
@@ -123,9 +122,39 @@ export default function NotePage() {
     }
   }, [groupId, noteId]);
 
+  // Keyboard shortcut: Ctrl+S to save
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (isEditingContent && hasUnsavedChanges) {
+          handleSaveContent();
+        }
+      }
+      // Escape to cancel editing
+      if (e.key === 'Escape' && isEditingContent) {
+        setEditContent(note?.content || '');
+        setIsEditingContent(false);
+        setHasUnsavedChanges(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isEditingContent, hasUnsavedChanges, editContent, note]);
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
   const fetchData = async () => {
     try {
-      // Fetch note, group, and author in parallel
       const [noteResult, groupResult] = await Promise.all([
         supabase.from('notes').select('*').eq('id', noteId).single(),
         supabase.from('groups').select('id, name, color').eq('id', groupId).single(),
@@ -134,7 +163,6 @@ export default function NotePage() {
       if (noteResult.error) throw noteResult.error;
       if (groupResult.error) throw groupResult.error;
 
-      // Parse attachments from JSON
       const rawNote = noteResult.data;
       const parsedAttachments: Attachment[] = [];
       if (Array.isArray(rawNote.attachments)) {
@@ -160,7 +188,6 @@ export default function NotePage() {
       setEditLectureNumber(noteData.lecture_number?.toString() || '');
       setEditTopic(noteData.topic || '');
 
-      // Fetch author profile
       if (noteData.created_by) {
         const { data: authorData } = await supabase
           .from('profiles')
@@ -201,7 +228,7 @@ export default function NotePage() {
     }
   };
 
-  const handleSaveContent = async () => {
+  const handleSaveContent = useCallback(async () => {
     if (!note) return;
     setSaving(true);
     try {
@@ -211,15 +238,21 @@ export default function NotePage() {
         .eq('id', note.id);
 
       if (error) throw error;
-      setNote({ ...note, content: editContent });
+      setNote(prev => prev ? { ...prev, content: editContent } : null);
       setIsEditingContent(false);
+      setHasUnsavedChanges(false);
       toast({ title: 'Saved', description: 'Content updated' });
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to save content', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
-  };
+  }, [note, editContent]);
+
+  const handleContentChange = useCallback((newContent: string) => {
+    setEditContent(newContent);
+    setHasUnsavedChanges(true);
+  }, []);
 
   const handleSaveProperty = async (field: 'lecture_number' | 'topic', value: string | number | null) => {
     if (!note) return;
@@ -350,19 +383,34 @@ export default function NotePage() {
 
             {/* Actions */}
             <div className="flex items-center gap-2">
-              {note.updated_at && (
+              {/* Unsaved changes indicator */}
+              {hasUnsavedChanges && (
+                <span className="text-xs text-amber-500 font-medium hidden sm:block">
+                  Unsaved changes
+                </span>
+              )}
+
+              {note.updated_at && !hasUnsavedChanges && (
                 <span className="text-xs text-muted-foreground hidden sm:block">
                   Edited {format(new Date(note.updated_at), 'MMM d, yyyy')}
                 </span>
               )}
               
-              <Badge variant="outline" className="gap-1">
-                <Lock className="h-3 w-3" />
-                Private
-              </Badge>
-
               {note.is_pinned && (
                 <Star className="h-4 w-4 text-yellow-500 fill-current" />
+              )}
+
+              {/* Save button when editing */}
+              {isEditingContent && (
+                <Button 
+                  size="sm" 
+                  onClick={handleSaveContent} 
+                  disabled={saving || !hasUnsavedChanges}
+                  className="gap-1.5"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Save</span>
+                </Button>
               )}
 
               <DropdownMenu>
@@ -372,6 +420,15 @@ export default function NotePage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {canEdit && !isEditingContent && (
+                    <DropdownMenuItem onClick={() => {
+                      setEditContent(note.content || '');
+                      setIsEditingContent(true);
+                    }}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit Content
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={handleTogglePin}>
                     <Pin className="h-4 w-4 mr-2" />
                     {note.is_pinned ? 'Unpin' : 'Pin'} Note
@@ -431,7 +488,7 @@ export default function NotePage() {
               </div>
             ) : (
               <h1 
-                className={`text-4xl font-bold ${canEdit ? 'cursor-text hover:bg-muted/50 rounded px-2 -mx-2 py-1' : ''}`}
+                className={`text-4xl font-bold ${canEdit ? 'cursor-text hover:bg-muted/50 rounded px-2 -mx-2 py-1 transition-colors' : ''}`}
                 onClick={() => canEdit && setIsEditingTitle(true)}
               >
                 {note.title}
@@ -464,6 +521,12 @@ export default function NotePage() {
                   value={editLectureNumber}
                   onChange={(e) => setEditLectureNumber(e.target.value)}
                   onBlur={() => handleSaveProperty('lecture_number', editLectureNumber ? parseInt(editLectureNumber) : null)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSaveProperty('lecture_number', editLectureNumber ? parseInt(editLectureNumber) : null);
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
                   className="w-20 h-8 text-sm"
                   placeholder="—"
                 />
@@ -485,6 +548,12 @@ export default function NotePage() {
                   value={editTopic}
                   onChange={(e) => setEditTopic(e.target.value)}
                   onBlur={() => handleSaveProperty('topic', editTopic || null)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSaveProperty('topic', editTopic || null);
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
                   className="flex-1 max-w-xs h-8 text-sm"
                   placeholder="Add topic..."
                 />
@@ -554,23 +623,11 @@ export default function NotePage() {
                 )}
               </div>
             </div>
-
-            {/* Add a property button */}
-            {canEdit && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-foreground -ml-2"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add a property
-              </Button>
-            )}
           </div>
 
           <Separator className="my-6" />
 
-          {/* Author / Comments placeholder */}
+          {/* Author */}
           <div className="mb-6">
             <div className="text-sm text-muted-foreground mb-2">Author</div>
             <div className="flex items-center gap-3">
@@ -622,7 +679,7 @@ export default function NotePage() {
             </div>
           )}
 
-          {/* Version History & Content */}
+          {/* Version History */}
           {canEdit && (
             <div className="flex justify-end mb-4">
               <NoteVersionHistory
@@ -639,6 +696,7 @@ export default function NotePage() {
                     setNote({ ...note, title, content });
                     setEditTitle(title);
                     setEditContent(content);
+                    setHasUnsavedChanges(false);
                   } catch (err) {
                     toast({ title: 'Error', description: 'Failed to restore version', variant: 'destructive' });
                   }
@@ -647,16 +705,17 @@ export default function NotePage() {
             </div>
           )}
 
+          {/* Content Area */}
           <div className="min-h-[200px]">
             {isEditingContent && canEdit ? (
               <div className="space-y-3">
                 <RichTextEditor
                   content={editContent}
-                  onChange={setEditContent}
+                  onChange={handleContentChange}
                   placeholder="Write your notes here..."
                 />
-                <div className="flex gap-2">
-                  <Button onClick={handleSaveContent} disabled={saving}>
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleSaveContent} disabled={saving || !hasUnsavedChanges}>
                     <Save className="h-4 w-4 mr-2" />
                     Save
                   </Button>
@@ -665,17 +724,34 @@ export default function NotePage() {
                     onClick={() => {
                       setEditContent(note.content || '');
                       setIsEditingContent(false);
+                      setHasUnsavedChanges(false);
                     }}
                   >
                     Cancel
                   </Button>
+                  <span className="text-xs text-muted-foreground ml-2">
+                    Ctrl+S to save · Esc to cancel
+                  </span>
                 </div>
               </div>
             ) : (
               <div 
-                className={`${canEdit ? 'cursor-text hover:bg-muted/30 rounded-lg p-4 -m-4' : ''}`}
-                onClick={() => canEdit && setIsEditingContent(true)}
+                className={`relative group ${canEdit ? 'cursor-text hover:bg-muted/30 rounded-lg p-4 -m-4 transition-colors' : ''}`}
+                onClick={() => {
+                  if (canEdit) {
+                    setEditContent(note.content || '');
+                    setIsEditingContent(true);
+                  }
+                }}
               >
+                {canEdit && (
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                  </div>
+                )}
                 {note.content ? (
                   <RichTextViewer content={note.content} />
                 ) : (
