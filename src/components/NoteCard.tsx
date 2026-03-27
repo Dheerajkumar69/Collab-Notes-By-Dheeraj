@@ -250,13 +250,16 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
         <h3 className="font-semibold text-lg mb-2 line-clamp-2">{note.title}</h3>
 
         {note.content && !note.is_archived && (
-          <div className="text-muted-foreground text-sm mb-3 line-clamp-3 max-w-none overflow-hidden">
+          <div className="text-muted-foreground text-sm mb-3 line-clamp-4 overflow-hidden">
             {note.content.startsWith('<') ? (
-              <RichTextViewer content={note.content} className="prose-sm" />
+              <div 
+                className="tiptap [&_*]:!m-0 [&_*]:!p-0" 
+                dangerouslySetInnerHTML={{ 
+                  __html: note.content.replace(/<img[^>]*>/g, '').slice(0, 500) 
+                }} 
+              />
             ) : (
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <ReactMarkdown>{note.content}</ReactMarkdown>
-              </div>
+              <p>{note.content.slice(0, 200)}</p>
             )}
           </div>
         )}
