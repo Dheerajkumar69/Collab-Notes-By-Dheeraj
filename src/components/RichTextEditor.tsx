@@ -81,7 +81,7 @@ export function RichTextEditor({
     // Only set content if it actually differs meaningfully
     const currentHTML = editor.getHTML();
     if (content !== currentHTML) {
-      editor.commands.setContent(content || '', false);
+      editor.commands.setContent(content || '', { emitUpdate: false });
     }
   }, [content, editor]);
 
@@ -261,7 +261,7 @@ export function RichTextViewer({ content, className = '' }: { content: string; c
 
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content || '', false);
+      editor.commands.setContent(content || '', { emitUpdate: false });
     }
   }, [content, editor]);
 
