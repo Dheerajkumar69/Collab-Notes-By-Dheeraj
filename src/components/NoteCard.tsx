@@ -33,7 +33,6 @@ import { toast } from '@/hooks/use-toast';
 import { NoteViewDialog } from './NoteViewDialog';
 import { EditRequestDialog } from './EditRequestDialog';
 import { useDeleteNoteWithCleanup } from '@/hooks/useDeleteNoteWithCleanup';
-import { useDeleteNoteWithCleanup } from '@/hooks/useDeleteNoteWithCleanup';
 import { useTelegramSync } from '@/hooks/useTelegramSync';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
