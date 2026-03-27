@@ -166,3 +166,92 @@ All colors MUST be HSL.
   padding: 0.125rem 0.25rem;
   font-weight: 500;
 }
+
+/* Fix list rendering in Tiptap */
+.tiptap ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.tiptap ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.tiptap ul li,
+.tiptap ol li {
+  display: list-item;
+  margin: 0.25em 0;
+}
+
+.tiptap ul li p,
+.tiptap ol li p {
+  margin: 0;
+  display: inline;
+}
+
+.tiptap ul ul {
+  list-style-type: circle;
+}
+
+.tiptap ul ul ul {
+  list-style-type: square;
+}
+
+.tiptap blockquote {
+  border-left: 3px solid hsl(var(--border));
+  padding-left: 1em;
+  margin: 0.5em 0;
+  color: hsl(var(--muted-foreground));
+}
+
+.tiptap pre {
+  background: hsl(var(--muted));
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin: 0.5em 0;
+  overflow-x: auto;
+}
+
+.tiptap pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.875em;
+}
+
+.tiptap code {
+  background: hsl(var(--muted));
+  border-radius: 0.25rem;
+  padding: 0.15em 0.3em;
+  font-size: 0.875em;
+}
+
+.tiptap h1 {
+  font-size: 1.75em;
+  font-weight: 700;
+  margin: 0.75em 0 0.25em;
+}
+
+.tiptap h2 {
+  font-size: 1.375em;
+  font-weight: 600;
+  margin: 0.75em 0 0.25em;
+}
+
+.tiptap h3 {
+  font-size: 1.125em;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+}
+
+.tiptap hr {
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+  margin: 1em 0;
+}
+
+.tiptap p {
+  margin: 0.25em 0;
+}

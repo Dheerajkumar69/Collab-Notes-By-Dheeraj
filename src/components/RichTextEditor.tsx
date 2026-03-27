@@ -22,7 +22,7 @@ import {
   Redo,
   Minus,
 } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface RichTextEditorProps {
   content: string;
@@ -39,10 +39,20 @@ export function RichTextEditor({
   editable = true,
   className = '',
 }: RichTextEditorProps) {
+  const isInternalUpdate = useRef(false);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
+        bulletList: {
+          keepMarks: true,
+          keepAttributes: false,
+        },
+        orderedList: {
+          keepMarks: true,
+          keepAttributes: false,
+        },
       }),
       Placeholder.configure({ placeholder }),
       Highlight,
@@ -51,20 +61,29 @@ export function RichTextEditor({
     content: content || '',
     editable,
     onUpdate: ({ editor }) => {
+      isInternalUpdate.current = true;
       onChange(editor.getHTML());
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[200px] px-4 py-3',
+        class: 'focus:outline-none min-h-[200px] px-4 py-3',
       },
     },
   });
 
+  // Only sync content from props when it's an external change (not from our own onUpdate)
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content || '');
+    if (!editor) return;
+    if (isInternalUpdate.current) {
+      isInternalUpdate.current = false;
+      return;
     }
-  }, [content]);
+    // Only set content if it actually differs meaningfully
+    const currentHTML = editor.getHTML();
+    if (content !== currentHTML) {
+      editor.commands.setContent(content || '', false);
+    }
+  }, [content, editor]);
 
   useEffect(() => {
     if (editor) {
@@ -90,7 +109,10 @@ export function RichTextEditor({
       variant="ghost"
       size="sm"
       className={`h-8 w-8 p-0 ${isActive ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}
-      onClick={onClick}
+      onClick={(e) => {
+        e.preventDefault();
+        onClick();
+      }}
       title={title}
     >
       {children}
@@ -100,25 +122,25 @@ export function RichTextEditor({
   return (
     <div className={`border rounded-lg overflow-hidden bg-background ${className}`}>
       {editable && (
-        <div className="flex items-center gap-0.5 flex-wrap px-2 py-1.5 border-b bg-muted/30">
+        <div className="flex items-center gap-0.5 flex-wrap px-2 py-1.5 border-b bg-muted/30 sticky top-0 z-10">
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBold().run()}
             isActive={editor.isActive('bold')}
-            title="Bold"
+            title="Bold (Ctrl+B)"
           >
             <Bold className="h-4 w-4" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleItalic().run()}
             isActive={editor.isActive('italic')}
-            title="Italic"
+            title="Italic (Ctrl+I)"
           >
             <Italic className="h-4 w-4" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleUnderline().run()}
             isActive={editor.isActive('underline')}
-            title="Underline"
+            title="Underline (Ctrl+U)"
           >
             <UnderlineIcon className="h-4 w-4" />
           </ToolbarButton>
@@ -202,13 +224,13 @@ export function RichTextEditor({
 
           <ToolbarButton
             onClick={() => editor.chain().focus().undo().run()}
-            title="Undo"
+            title="Undo (Ctrl+Z)"
           >
             <Undo className="h-4 w-4" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().redo().run()}
-            title="Redo"
+            title="Redo (Ctrl+Shift+Z)"
           >
             <Redo className="h-4 w-4" />
           </ToolbarButton>
@@ -232,14 +254,14 @@ export function RichTextViewer({ content, className = '' }: { content: string; c
     editable: false,
     editorProps: {
       attributes: {
-        class: `prose prose-lg dark:prose-invert max-w-none ${className}`,
+        class: className,
       },
     },
   });
 
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content || '');
+      editor.commands.setContent(content || '', false);
     }
   }, [content, editor]);
 
