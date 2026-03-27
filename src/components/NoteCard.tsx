@@ -32,8 +32,7 @@ import { MoreVertical, Pin, Edit, Trash2, Smile, Archive, ArchiveRestore, Loader
 import { toast } from '@/hooks/use-toast';
 import { NoteViewDialog } from './NoteViewDialog';
 import { EditRequestDialog } from './EditRequestDialog';
-import ReactMarkdown from 'react-markdown';
-import { RichTextViewer } from './RichTextEditor';
+import { useDeleteNoteWithCleanup } from '@/hooks/useDeleteNoteWithCleanup';
 import { useDeleteNoteWithCleanup } from '@/hooks/useDeleteNoteWithCleanup';
 import { useTelegramSync } from '@/hooks/useTelegramSync';
 import { supabase } from '@/integrations/supabase/client';
