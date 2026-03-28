@@ -116,6 +116,32 @@ export default function NotePage() {
   
   const canEdit = note?.created_by === user?.id;
 
+  const handleSaveContent = useCallback(async () => {
+    if (!note) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('notes')
+        .update({ content: editContent, updated_at: new Date().toISOString() })
+        .eq('id', note.id);
+
+      if (error) throw error;
+      setNote(prev => prev ? { ...prev, content: editContent } : null);
+      setIsEditingContent(false);
+      setHasUnsavedChanges(false);
+      toast({ title: 'Saved', description: 'Content updated' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to save content', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }, [note, editContent]);
+
+  const handleContentChange = useCallback((newContent: string) => {
+    setEditContent(newContent);
+    setHasUnsavedChanges(true);
+  }, []);
+
   useEffect(() => {
     if (groupId && noteId) {
       fetchData();
