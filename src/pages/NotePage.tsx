@@ -254,31 +254,6 @@ export default function NotePage() {
     }
   };
 
-  const handleSaveContent = useCallback(async () => {
-    if (!note) return;
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from('notes')
-        .update({ content: editContent, updated_at: new Date().toISOString() })
-        .eq('id', note.id);
-
-      if (error) throw error;
-      setNote(prev => prev ? { ...prev, content: editContent } : null);
-      setIsEditingContent(false);
-      setHasUnsavedChanges(false);
-      toast({ title: 'Saved', description: 'Content updated' });
-    } catch (error) {
-      toast({ title: 'Error', description: 'Failed to save content', variant: 'destructive' });
-    } finally {
-      setSaving(false);
-    }
-  }, [note, editContent]);
-
-  const handleContentChange = useCallback((newContent: string) => {
-    setEditContent(newContent);
-    setHasUnsavedChanges(true);
-  }, []);
 
   const handleSaveProperty = async (field: 'lecture_number' | 'topic', value: string | number | null) => {
     if (!note) return;
