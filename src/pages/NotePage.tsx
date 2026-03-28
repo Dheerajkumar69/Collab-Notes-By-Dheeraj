@@ -140,7 +140,7 @@ export default function NotePage() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isEditingContent, hasUnsavedChanges, editContent, note]);
+  }, [isEditingContent, hasUnsavedChanges, handleSaveContent, note]);
 
   // Warn before leaving with unsaved changes
   useEffect(() => {
