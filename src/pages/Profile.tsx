@@ -83,9 +83,8 @@ export default function Profile() {
 
       if (profileError) throw profileError;
 
-      // Update auth user
+      // Update auth user metadata (name only, email is locked)
       const { error: authError } = await supabase.auth.updateUser({
-        email: data.email,
         data: {
           full_name: data.fullName,
         }
@@ -173,12 +172,11 @@ export default function Profile() {
                   id="email"
                   type="email"
                   {...register('email')}
+                  disabled
+                  className="bg-muted"
                 />
-                {errors.email && (
-                  <p className="text-sm text-red-500 mt-1">{errors.email.message}</p>
-                )}
                 <p className="text-xs text-muted-foreground mt-1">
-                  Changing your email will require verification via the new email address.
+                  Email cannot be changed for security reasons.
                 </p>
               </div>
 

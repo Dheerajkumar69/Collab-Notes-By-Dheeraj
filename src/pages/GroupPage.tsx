@@ -146,12 +146,26 @@ export default function GroupPage() {
 
       if (groupData) {
         const allEmails = [...(groupData.members || [])];
-        const { data: profiles } = await supabase
+        
+        // Fetch member profiles by email
+        const memberProfiles = allEmails.length > 0 
+          ? (await supabase.from('profiles').select('*').in('email', allEmails)).data || []
+          : [];
+        
+        // Also fetch the creator profile by ID (may not be in members array)
+        const { data: creatorProfile } = await supabase
           .from('profiles')
           .select('*')
-          .in('email', allEmails);
-
-        setMembers(profiles || []);
+          .eq('id', groupData.created_by)
+          .single();
+        
+        // Merge without duplicates
+        const allProfiles = [...memberProfiles];
+        if (creatorProfile && !allProfiles.some(p => p.id === creatorProfile.id)) {
+          allProfiles.unshift(creatorProfile);
+        }
+        
+        setMembers(allProfiles);
       }
     } catch (error: any) {
       console.error('Error fetching members:', error);
@@ -236,7 +250,7 @@ export default function GroupPage() {
       noteCountByFolder[fid] = (noteCountByFolder[fid] || 0) + 1;
     }
   });
-  const totalUnfoldered = notes.filter(n => !n.is_archived).length;
+  const totalUnfoldered = notes.filter(n => !n.is_archived && !(n as any).folder_id).length;
 
   const getColorClass = (color?: string) => {
     switch (color) {

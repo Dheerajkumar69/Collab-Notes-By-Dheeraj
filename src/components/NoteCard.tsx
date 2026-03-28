@@ -251,7 +251,7 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
           <div className="text-muted-foreground text-sm mb-3 line-clamp-4 overflow-hidden">
             {note.content.startsWith('<') ? (
               <div 
-                className="tiptap [&_*]:!m-0 [&_*]:!p-0" 
+                className="tiptap prose prose-sm dark:prose-invert max-w-none [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_p]:my-0.5" 
                 dangerouslySetInnerHTML={{ 
                   __html: note.content.replace(/<img[^>]*>/g, '').slice(0, 500) 
                 }} 

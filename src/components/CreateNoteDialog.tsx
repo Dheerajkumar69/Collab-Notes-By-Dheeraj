@@ -324,7 +324,7 @@ export function CreateNoteDialog({
               <Input
                 value={newLabel}
                 onChange={e => setNewLabel(e.target.value)}
-                onKeyPress={e => e.key === 'Enter' && addLabel()}
+                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addLabel())}
                 placeholder="Add label"
               />
               <Button onClick={addLabel} variant="outline">

@@ -73,7 +73,7 @@ export default function Auth() {
         title: 'Success',
         description: 'Signed in successfully',
       });
-      navigate(from, { replace: true });
+      // Navigation handled by useEffect watching user state
     }
 
     setIsLoading(false);
