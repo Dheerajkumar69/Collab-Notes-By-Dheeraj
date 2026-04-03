@@ -631,6 +631,15 @@ export default function NotePage() {
 
           <Separator className="my-6" />
 
+          {/* Reminder & AI Tools */}
+          <div className="flex flex-wrap items-center gap-2 mb-6">
+            <NoteReminder noteId={note.id} groupId={group.id} noteTitle={note.title} />
+            <AISummarize noteTitle={note.title} noteContent={note.content || ''} />
+            <NoteExport title={note.title} content={note.content || ''} />
+          </div>
+
+          <Separator className="my-6" />
+
           {/* Author */}
           <div className="mb-6">
             <div className="text-sm text-muted-foreground mb-2">Author</div>
