@@ -12,6 +12,8 @@ import { FeedbackDialog } from '@/components/FeedbackDialog';
 import { ExportNotesDialog } from '@/components/ExportNotesDialog';
 import { ArchivedNotesSection } from '@/components/ArchivedNotesSection';
 import { CommandPalette } from '@/components/CommandPalette';
+import { GlobalSearch } from '@/components/GlobalSearch';
+import { UpcomingReminders } from '@/components/NoteReminder';
 import { useGroups, useProfile, useStats } from '@/hooks/supabase-hooks';
 import { useRealtimeGroups } from '@/hooks/useRealtimeSubscription';
 import { ErrorState } from '@/components/ErrorState';
