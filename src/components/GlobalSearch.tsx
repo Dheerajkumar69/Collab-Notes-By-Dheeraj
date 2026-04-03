@@ -81,7 +81,8 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
       const { data: noteGroups } = groupIds.length > 0
         ? await supabase.from('groups').select('id, name').in('id', groupIds)
         : { data: [] };
-      const groupMap = new Map(noteGroups?.map(g => [g.id, g.name]) || []);
+      const groupMap: Record<string, string> = {};
+      noteGroups?.forEach(g => { groupMap[g.id] = g.name; });
 
       const searchResults: SearchResult[] = [
         ...(groups?.map(g => ({
@@ -95,7 +96,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
           id: n.id,
           title: n.title,
           groupId: n.group_id,
-          groupName: groupMap.get(n.group_id) || 'Unknown',
+          groupName: groupMap[n.group_id] || 'Unknown',
           labels: n.labels || [],
           snippet: n.content
             ? n.content.replace(/<[^>]*>/g, ' ').substring(0, 100) + '...'
