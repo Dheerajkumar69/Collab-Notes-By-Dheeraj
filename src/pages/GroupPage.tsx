@@ -472,11 +472,12 @@ export default function GroupPage() {
         <div className="max-w-7xl mx-auto px-4">
           {isMobile ? (
             // Mobile: Separate tabs for Chat, Notes, and Members
-            <Tabs defaultValue="chat" className="w-full">
-              <TabsList className="mb-6 w-full grid grid-cols-3">
+             <Tabs defaultValue="chat" className="w-full">
+              <TabsList className="mb-6 w-full grid grid-cols-4">
                 <TabsTrigger value="chat">💬 Chat</TabsTrigger>
                 <TabsTrigger value="notes">📝 Notes</TabsTrigger>
                 <TabsTrigger value="members">👥 Members</TabsTrigger>
+                <TabsTrigger value="activity"><Activity className="h-3 w-3 mr-1 inline" />Activity</TabsTrigger>
               </TabsList>
 
               <TabsContent value="chat" className="mt-0">
