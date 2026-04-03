@@ -406,5 +406,15 @@ export function CreateNoteDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <NoteTemplates
+      open={showTemplates}
+      onOpenChange={setShowTemplates}
+      onSelect={(templateContent, templateTitle) => {
+        setContent(templateContent);
+        if (!title) setTitle(templateTitle);
+      }}
+    />
+    </>
   );
 }
