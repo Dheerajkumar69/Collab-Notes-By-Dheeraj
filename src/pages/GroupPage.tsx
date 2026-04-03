@@ -538,6 +538,9 @@ export default function GroupPage() {
                   })}
                 </div>
               </TabsContent>
+              <TabsContent value="activity">
+                <ActivityFeed groupId={id!} />
+              </TabsContent>
             </Tabs>
           ) : (
             // Desktop: Separate tabs for Chat, Notes, and Members
