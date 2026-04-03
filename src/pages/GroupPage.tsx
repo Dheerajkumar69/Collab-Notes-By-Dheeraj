@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Copy, Settings, Trash2, UserX, Plus, Search } from 'lucide-react';
+import { Copy, Settings, Trash2, UserX, Plus, Search, Activity } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { CreateNoteDialog } from '@/components/CreateNoteDialog';
 import { GroupSettings } from '@/components/GroupSettings';
@@ -20,6 +20,8 @@ import { useRealtimeNotes } from '@/hooks/useRealtimeSubscription';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { QuickNoteInput } from '@/components/QuickNoteInput';
 import { FolderTree } from '@/components/FolderTree';
+import { useUserPresence, OnlineDot } from '@/components/UserPresence';
+import { ActivityFeed, logActivity } from '@/components/ActivityFeed';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -83,6 +85,9 @@ export default function GroupPage() {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  
+  // Presence tracking
+  const onlineUsers = useUserPresence(id || '');
 
   // Enable realtime updates for notes in this group
   useRealtimeNotes(id);
@@ -467,11 +472,12 @@ export default function GroupPage() {
         <div className="max-w-7xl mx-auto px-4">
           {isMobile ? (
             // Mobile: Separate tabs for Chat, Notes, and Members
-            <Tabs defaultValue="chat" className="w-full">
-              <TabsList className="mb-6 w-full grid grid-cols-3">
+             <Tabs defaultValue="chat" className="w-full">
+              <TabsList className="mb-6 w-full grid grid-cols-4">
                 <TabsTrigger value="chat">💬 Chat</TabsTrigger>
                 <TabsTrigger value="notes">📝 Notes</TabsTrigger>
                 <TabsTrigger value="members">👥 Members</TabsTrigger>
+                <TabsTrigger value="activity"><Activity className="h-3 w-3 mr-1 inline" />Activity</TabsTrigger>
               </TabsList>
 
               <TabsContent value="chat" className="mt-0">
@@ -496,10 +502,11 @@ export default function GroupPage() {
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <Avatar>
+                       <Avatar className="relative">
                               <AvatarFallback className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white">
                                 {member.full_name?.charAt(0) || 'U'}
                               </AvatarFallback>
+                              <OnlineDot isOnline={onlineUsers.has(member.id)} />
                             </Avatar>
                             <div>
                               <p className="font-medium">{member.full_name}</p>
@@ -531,6 +538,9 @@ export default function GroupPage() {
                   })}
                 </div>
               </TabsContent>
+              <TabsContent value="activity">
+                <ActivityFeed groupId={id!} />
+              </TabsContent>
             </Tabs>
           ) : (
             // Desktop: Separate tabs for Chat, Notes, and Members
@@ -539,6 +549,7 @@ export default function GroupPage() {
                 <TabsTrigger value="chat">💬 Chat</TabsTrigger>
                 <TabsTrigger value="notes">📝 Notes</TabsTrigger>
                 <TabsTrigger value="members">👥 Members</TabsTrigger>
+                <TabsTrigger value="activity"><Activity className="h-3 w-3 mr-1 inline" />Activity</TabsTrigger>
               </TabsList>
 
               <TabsContent value="chat" className="mt-0">
@@ -563,10 +574,11 @@ export default function GroupPage() {
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <Avatar>
+                            <Avatar className="relative">
                               <AvatarFallback className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white">
                                 {member.full_name?.charAt(0) || 'U'}
                               </AvatarFallback>
+                              <OnlineDot isOnline={onlineUsers.has(member.id)} />
                             </Avatar>
                             <div>
                               <p className="font-medium">{member.full_name}</p>
@@ -597,6 +609,9 @@ export default function GroupPage() {
                     );
                   })}
                 </div>
+              </TabsContent>
+              <TabsContent value="activity">
+                <ActivityFeed groupId={id!} />
               </TabsContent>
             </Tabs>
           )}

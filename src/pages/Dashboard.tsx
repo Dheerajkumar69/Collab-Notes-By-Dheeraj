@@ -12,6 +12,8 @@ import { FeedbackDialog } from '@/components/FeedbackDialog';
 import { ExportNotesDialog } from '@/components/ExportNotesDialog';
 import { ArchivedNotesSection } from '@/components/ArchivedNotesSection';
 import { CommandPalette } from '@/components/CommandPalette';
+import { GlobalSearch } from '@/components/GlobalSearch';
+import { UpcomingReminders } from '@/components/NoteReminder';
 import { useGroups, useProfile, useStats } from '@/hooks/supabase-hooks';
 import { useRealtimeGroups } from '@/hooks/useRealtimeSubscription';
 import { ErrorState } from '@/components/ErrorState';
@@ -37,6 +39,7 @@ export default function Dashboard() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const GROUPS_PER_PAGE = 9;
@@ -148,6 +151,10 @@ export default function Dashboard() {
               </motion.div>
               <ExportNotesDialog />
               <FeedbackDialog />
+              <Button variant="outline" onClick={() => setGlobalSearchOpen(true)} className="gap-2">
+                <Search size={16} />
+                Search All
+              </Button>
               <KeyboardShortcutsHint />
             </div>
           </div>
@@ -251,6 +258,11 @@ export default function Dashboard() {
             </ScaleOnHover>
           </StaggerItem>
         </StaggerContainer>
+
+        {/* Upcoming Reminders */}
+        <FadeIn delay={0.15}>
+          <UpcomingReminders />
+        </FadeIn>
 
         {/* Search & Sort */}
         <FadeIn delay={0.2}>
@@ -398,6 +410,7 @@ export default function Dashboard() {
         onOpenChange={setCommandPaletteOpen}
         onCreateGroup={() => setCreateDialogOpen(true)}
       />
+      <GlobalSearch open={globalSearchOpen} onOpenChange={setGlobalSearchOpen} />
     </Layout>
   );
 }

@@ -14,8 +14,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Upload, X, Loader2 } from 'lucide-react';
+import { Upload, X, Loader2, LayoutTemplate } from 'lucide-react';
 import { useTelegramSync } from '@/hooks/useTelegramSync';
+import { NoteTemplates } from '@/components/NoteTemplates';
 
 interface CreateNoteDialogProps {
   open: boolean;
@@ -55,6 +56,7 @@ export function CreateNoteDialog({
   const [processing, setProcessing] = useState(false);
   const [lectureNumber, setLectureNumber] = useState<number | ''>('');
   const [topic, setTopic] = useState('');
+  const [showTemplates, setShowTemplates] = useState(false);
 
   useEffect(() => {
     if (editingNote) {
@@ -233,10 +235,19 @@ export function CreateNoteDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editingNote ? 'Edit Note' : 'Create Note'}</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>{editingNote ? 'Edit Note' : 'Create Note'}</DialogTitle>
+            {!editingNote && (
+              <Button variant="outline" size="sm" onClick={() => setShowTemplates(true)} className="gap-1.5">
+                <LayoutTemplate className="h-3.5 w-3.5" />
+                Templates
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -396,5 +407,15 @@ export function CreateNoteDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <NoteTemplates
+      open={showTemplates}
+      onOpenChange={setShowTemplates}
+      onSelect={(templateContent, templateTitle) => {
+        setContent(templateContent);
+        if (!title) setTitle(templateTitle);
+      }}
+    />
+    </>
   );
 }

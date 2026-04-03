@@ -8,6 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { RichTextEditor, RichTextViewer } from '@/components/RichTextEditor';
 import { NoteVersionHistory } from '@/components/NoteVersionHistory';
+import { AISummarize } from '@/components/AISummarize';
+import { NoteExport } from '@/components/NoteExport';
+import { NoteReminder } from '@/components/NoteReminder';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { 
@@ -624,6 +627,15 @@ export default function NotePage() {
                 )}
               </div>
             </div>
+          </div>
+
+          <Separator className="my-6" />
+
+          {/* Reminder & AI Tools */}
+          <div className="flex flex-wrap items-center gap-2 mb-6">
+            <NoteReminder noteId={note.id} groupId={group.id} noteTitle={note.title} />
+            <AISummarize noteTitle={note.title} noteContent={note.content || ''} />
+            <NoteExport title={note.title} content={note.content || ''} />
           </div>
 
           <Separator className="my-6" />

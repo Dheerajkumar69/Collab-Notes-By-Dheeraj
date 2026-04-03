@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          group_id: string
+          id: string
+          metadata: Json | null
+          target_id: string | null
+          target_type: string | null
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          group_id: string
+          id?: string
+          metadata?: Json | null
+          target_id?: string | null
+          target_type?: string | null
+          user_id: string
+          user_name: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          group_id?: string
+          id?: string
+          metadata?: Json | null
+          target_id?: string | null
+          target_type?: string | null
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feedback: {
         Row: {
           created_at: string
@@ -137,6 +181,35 @@ export type Database = {
         }
         Relationships: []
       }
+      message_read_receipts: {
+        Row: {
+          id: string
+          message_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          message_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          message_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_read_receipts_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           attachments: Json | null
@@ -191,6 +264,84 @@ export type Database = {
           },
         ]
       }
+      note_reminders: {
+        Row: {
+          created_at: string
+          due_date: string
+          group_id: string
+          id: string
+          is_completed: boolean
+          note_id: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          due_date: string
+          group_id: string
+          id?: string
+          is_completed?: boolean
+          note_id: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          due_date?: string
+          group_id?: string
+          id?: string
+          is_completed?: boolean
+          note_id?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_reminders_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "note_reminders_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      note_templates: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_system: boolean
+          name: string
+        }
+        Insert: {
+          category?: string
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_system?: boolean
+          name: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_system?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
       note_versions: {
         Row: {
           content: string | null
@@ -237,6 +388,7 @@ export type Database = {
           content: string | null
           created_at: string | null
           created_by: string
+          due_date: string | null
           edit_requests: Json | null
           folder_id: string | null
           group_id: string
@@ -259,6 +411,7 @@ export type Database = {
           content?: string | null
           created_at?: string | null
           created_by: string
+          due_date?: string | null
           edit_requests?: Json | null
           folder_id?: string | null
           group_id: string
@@ -281,6 +434,7 @@ export type Database = {
           content?: string | null
           created_at?: string | null
           created_by?: string
+          due_date?: string | null
           edit_requests?: Json | null
           folder_id?: string | null
           group_id?: string
@@ -392,6 +546,38 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "typing_indicators_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_presence: {
+        Row: {
+          group_id: string
+          id: string
+          is_online: boolean
+          last_seen: string
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          is_online?: boolean
+          last_seen?: string
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          is_online?: boolean
+          last_seen?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_presence_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "groups"
