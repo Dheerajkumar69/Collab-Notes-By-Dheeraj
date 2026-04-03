@@ -410,6 +410,7 @@ export default function Dashboard() {
         onOpenChange={setCommandPaletteOpen}
         onCreateGroup={() => setCreateDialogOpen(true)}
       />
+      <GlobalSearch open={globalSearchOpen} onOpenChange={setGlobalSearchOpen} />
     </Layout>
   );
 }
