@@ -259,6 +259,11 @@ export default function Dashboard() {
           </StaggerItem>
         </StaggerContainer>
 
+        {/* Upcoming Reminders */}
+        <FadeIn delay={0.15}>
+          <UpcomingReminders />
+        </FadeIn>
+
         {/* Search & Sort */}
         <FadeIn delay={0.2}>
           <motion.div
