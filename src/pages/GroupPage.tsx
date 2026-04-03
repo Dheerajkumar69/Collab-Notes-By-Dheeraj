@@ -85,6 +85,9 @@ export default function GroupPage() {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  
+  // Presence tracking
+  const onlineUsers = useUserPresence(id || '');
 
   // Enable realtime updates for notes in this group
   useRealtimeNotes(id);
