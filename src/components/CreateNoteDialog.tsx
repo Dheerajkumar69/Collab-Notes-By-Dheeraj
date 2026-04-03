@@ -238,7 +238,15 @@ export function CreateNoteDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editingNote ? 'Edit Note' : 'Create Note'}</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>{editingNote ? 'Edit Note' : 'Create Note'}</DialogTitle>
+            {!editingNote && (
+              <Button variant="outline" size="sm" onClick={() => setShowTemplates(true)} className="gap-1.5">
+                <LayoutTemplate className="h-3.5 w-3.5" />
+                Templates
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">
