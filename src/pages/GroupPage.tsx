@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Copy, Settings, Trash2, UserX, Plus, Search } from 'lucide-react';
+import { Copy, Settings, Trash2, UserX, Plus, Search, Activity } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { CreateNoteDialog } from '@/components/CreateNoteDialog';
 import { GroupSettings } from '@/components/GroupSettings';
@@ -20,6 +20,8 @@ import { useRealtimeNotes } from '@/hooks/useRealtimeSubscription';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { QuickNoteInput } from '@/components/QuickNoteInput';
 import { FolderTree } from '@/components/FolderTree';
+import { useUserPresence, OnlineDot } from '@/components/UserPresence';
+import { ActivityFeed, logActivity } from '@/components/ActivityFeed';
 import {
   AlertDialog,
   AlertDialogAction,
