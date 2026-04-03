@@ -610,6 +610,9 @@ export default function GroupPage() {
                   })}
                 </div>
               </TabsContent>
+              <TabsContent value="activity">
+                <ActivityFeed groupId={id!} />
+              </TabsContent>
             </Tabs>
           )}
         </div>
