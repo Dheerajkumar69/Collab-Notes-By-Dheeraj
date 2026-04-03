@@ -8,6 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { RichTextEditor, RichTextViewer } from '@/components/RichTextEditor';
 import { NoteVersionHistory } from '@/components/NoteVersionHistory';
+import { AISummarize } from '@/components/AISummarize';
+import { NoteExport } from '@/components/NoteExport';
+import { NoteReminder } from '@/components/NoteReminder';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { 
