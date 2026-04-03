@@ -151,6 +151,10 @@ export default function Dashboard() {
               </motion.div>
               <ExportNotesDialog />
               <FeedbackDialog />
+              <Button variant="outline" onClick={() => setGlobalSearchOpen(true)} className="gap-2">
+                <Search size={16} />
+                Search All
+              </Button>
               <KeyboardShortcutsHint />
             </div>
           </div>
