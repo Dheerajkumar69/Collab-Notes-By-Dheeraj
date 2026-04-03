@@ -56,6 +56,7 @@ export function CreateNoteDialog({
   const [processing, setProcessing] = useState(false);
   const [lectureNumber, setLectureNumber] = useState<number | ''>('');
   const [topic, setTopic] = useState('');
+  const [showTemplates, setShowTemplates] = useState(false);
 
   useEffect(() => {
     if (editingNote) {
