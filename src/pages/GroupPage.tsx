@@ -574,10 +574,11 @@ export default function GroupPage() {
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <Avatar>
+                            <Avatar className="relative">
                               <AvatarFallback className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white">
                                 {member.full_name?.charAt(0) || 'U'}
                               </AvatarFallback>
+                              <OnlineDot isOnline={onlineUsers.has(member.id)} />
                             </Avatar>
                             <div>
                               <p className="font-medium">{member.full_name}</p>
