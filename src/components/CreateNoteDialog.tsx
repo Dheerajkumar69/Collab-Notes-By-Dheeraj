@@ -14,8 +14,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Upload, X, Loader2 } from 'lucide-react';
+import { Upload, X, Loader2, LayoutTemplate } from 'lucide-react';
 import { useTelegramSync } from '@/hooks/useTelegramSync';
+import { NoteTemplates } from '@/components/NoteTemplates';
 
 interface CreateNoteDialogProps {
   open: boolean;
