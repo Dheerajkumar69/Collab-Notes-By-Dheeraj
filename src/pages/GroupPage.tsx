@@ -549,6 +549,7 @@ export default function GroupPage() {
                 <TabsTrigger value="chat">💬 Chat</TabsTrigger>
                 <TabsTrigger value="notes">📝 Notes</TabsTrigger>
                 <TabsTrigger value="members">👥 Members</TabsTrigger>
+                <TabsTrigger value="activity"><Activity className="h-3 w-3 mr-1 inline" />Activity</TabsTrigger>
               </TabsList>
 
               <TabsContent value="chat" className="mt-0">
