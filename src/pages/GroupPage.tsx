@@ -465,7 +465,7 @@ export default function GroupPage() {
                   className="text-white hover:bg-white/20 h-7 px-3"
                 >
                   <Copy className="h-3 w-3 mr-1" />
-                  {group.invite_code}
+                  Copy Invite Code
                 </Button>
               )}
             </div>

@@ -50,13 +50,17 @@ export function GroupSettings({
     }
   }, [group]);
 
-  const copyInviteCode = () => {
-    if (group?.invite_code) {
-      navigator.clipboard.writeText(group.invite_code);
+  const copyInviteCode = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_group_invite_code', { p_group_id: group?.id });
+      if (error) throw error;
+      navigator.clipboard.writeText(data);
       toast({
         title: 'Copied!',
         description: 'Invite code copied to clipboard',
       });
+    } catch {
+      toast({ title: 'Error', description: 'Could not retrieve invite code', variant: 'destructive' });
     }
   };
 
