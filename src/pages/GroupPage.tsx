@@ -404,7 +404,7 @@ export default function GroupPage() {
       <div className="min-h-screen">
         {/* Header */}
          <div
-           className={`bg-gradient-to-br ${getColorClass(group.color)} text-white p-8 mb-6 rounded-xl relative overflow-hidden`}
+           className={`bg-gradient-to-br ${getColorClass(group.color)} text-white p-8 mb-6 rounded-xl relative overflow-hidden min-h-[200px]`}
            style={
              group.background_image_url
                ? {
@@ -434,7 +434,7 @@ export default function GroupPage() {
                        variant="ghost"
                        size="icon"
                        onClick={() => setShowSettings(true)}
-                       className="text-white hover:bg-white/20"
+                        className="text-white hover:bg-white/20 bg-black/30 backdrop-blur-sm"
                      >
                        <Settings className="h-5 w-5" />
                      </Button>
@@ -442,7 +442,7 @@ export default function GroupPage() {
                        variant="ghost"
                        size="icon"
                        onClick={() => setShowDeleteDialog(true)}
-                       className="text-white hover:bg-white/20"
+                       className="text-white hover:bg-white/20 bg-black/30 backdrop-blur-sm"
                      >
                        <Trash2 className="h-5 w-5" />
                      </Button>
