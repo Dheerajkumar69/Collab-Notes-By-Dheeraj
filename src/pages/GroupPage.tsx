@@ -404,7 +404,7 @@ export default function GroupPage() {
       <div className="min-h-screen">
         {/* Header */}
          <div
-           className={`bg-gradient-to-br ${getColorClass(group.color)} text-white p-8 mb-6 rounded-xl relative overflow-hidden`}
+           className={`bg-gradient-to-br ${getColorClass(group.color)} text-white p-8 mb-6 rounded-xl relative overflow-hidden min-h-[200px]`}
            style={
              group.background_image_url
                ? {
