@@ -168,7 +168,7 @@ export function GroupSettings({
           <div>
             <Label>Invite Code</Label>
             <div className="flex gap-2">
-              <Input value={group?.invite_code || ''} disabled />
+              <Input value="••••••••" disabled />
               <Button variant="outline" onClick={copyInviteCode}>
                 <Copy className="h-4 w-4" />
               </Button>
