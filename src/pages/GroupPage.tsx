@@ -177,13 +177,17 @@ export default function GroupPage() {
     }
   };
 
-  const copyInviteCode = () => {
-    if (group?.invite_code) {
-      navigator.clipboard.writeText(group.invite_code);
+  const copyInviteCode = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_group_invite_code', { p_group_id: id });
+      if (error) throw error;
+      navigator.clipboard.writeText(data);
       toast({
         title: 'Copied!',
         description: 'Invite code copied to clipboard',
       });
+    } catch {
+      toast({ title: 'Error', description: 'Could not retrieve invite code', variant: 'destructive' });
     }
   };
 
@@ -461,7 +465,7 @@ export default function GroupPage() {
                   className="text-white hover:bg-white/20 h-7 px-3"
                 >
                   <Copy className="h-3 w-3 mr-1" />
-                  {group.invite_code}
+                  Copy Invite Code
                 </Button>
               )}
             </div>

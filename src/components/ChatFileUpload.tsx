@@ -60,12 +60,12 @@ export const ChatFileUpload = ({
           continue;
         }
 
-        const { data: urlData } = supabase.storage
+        const { data: urlData } = await supabase.storage
           .from('note-attachments')
-          .getPublicUrl(fileName);
+          .createSignedUrl(fileName, 60 * 60 * 24 * 365);
 
         uploadedFiles.push({
-          url: urlData.publicUrl,
+          url: urlData?.signedUrl || '',
           name: file.name,
           type: file.type,
           size: file.size,
