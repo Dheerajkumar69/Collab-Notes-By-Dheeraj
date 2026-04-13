@@ -130,12 +130,12 @@ export function CreateNoteDialog({
 
           if (uploadError) throw uploadError;
 
-          const {
-            data: { publicUrl },
-          } = supabase.storage.from('note-attachments').getPublicUrl(filePath);
+          const { data: signedUrlData } = await supabase.storage
+            .from('note-attachments')
+            .createSignedUrl(filePath, 60 * 60 * 24 * 365);
 
           return {
-            url: publicUrl,
+            url: signedUrlData?.signedUrl || '',
             name: file.name,
             type: file.type,
             size: file.size,
