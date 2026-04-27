@@ -446,7 +446,10 @@ export function CreateNoteDialog({
               {COLORS.map(c => (
                 <button
                   key={c.value}
+                  type="button"
                   onClick={() => setColor(c.value)}
+                  aria-label={`Color ${c.name}`}
+                  aria-pressed={color === c.value}
                   className={`w-10 h-10 rounded-lg border-2 ${
                     color === c.value
                       ? 'border-primary'
