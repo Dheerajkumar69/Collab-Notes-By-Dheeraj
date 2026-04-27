@@ -235,7 +235,7 @@ export function CreateNoteDialog({
         group_id: groupId,
         labels,
         color,
-        attachments,
+        attachments: attachments as unknown as object[],
         author_name: profile?.full_name || 'User',
         created_by: user.id,
         lecture_number:
