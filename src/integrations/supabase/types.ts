@@ -622,6 +622,7 @@ export type Database = {
             Args: { p_link?: string; p_message: string; p_user_id: string }
             Returns: string
           }
+      delete_group_cascade: { Args: { p_group_id: string }; Returns: Json }
       get_current_user_email: { Args: never; Returns: string }
       get_group_invite_code: { Args: { p_group_id: string }; Returns: string }
       has_role: {
@@ -633,6 +634,10 @@ export type Database = {
       }
       join_group_with_code: {
         Args: { p_invite_code: string; p_user_email: string }
+        Returns: Json
+      }
+      remove_group_member: {
+        Args: { p_email: string; p_group_id: string }
         Returns: Json
       }
     }
