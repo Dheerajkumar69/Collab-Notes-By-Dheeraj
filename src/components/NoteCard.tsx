@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { MoreVertical, Pin, Edit, Trash2, Smile, Archive, ArchiveRestore, Loader2, Hash } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { NoteViewDialog } from './NoteViewDialog';
