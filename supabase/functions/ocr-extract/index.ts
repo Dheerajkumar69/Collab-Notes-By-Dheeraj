@@ -1,4 +1,5 @@
 import { corsHeaders } from "../_shared/cors.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -9,11 +10,31 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { imageUrl } = await req.json();
+    const { imageUrl, storagePath } = await req.json();
 
-    if (!imageUrl || typeof imageUrl !== "string") {
+    let finalImageUrl: string | undefined = typeof imageUrl === "string" ? imageUrl : undefined;
+
+    // Preferred path: caller passes a storage path; we mint a short-lived signed URL server-side
+    if (typeof storagePath === "string" && storagePath.length > 0) {
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+      const { data: signed, error: signErr } = await admin.storage
+        .from("note-attachments")
+        .createSignedUrl(storagePath, 60 * 5); // 5 minutes
+      if (signErr || !signed?.signedUrl) {
+        console.error("Failed to sign URL", signErr);
+        return new Response(
+          JSON.stringify({ error: "Could not access file", extractedText: "" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      finalImageUrl = signed.signedUrl;
+    }
+
+    if (!finalImageUrl) {
       return new Response(
-        JSON.stringify({ error: "imageUrl is required" }),
+        JSON.stringify({ error: "imageUrl or storagePath is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -36,7 +57,7 @@ Deno.serve(async (req) => {
               },
               {
                 type: "image_url",
-                image_url: { url: imageUrl },
+                image_url: { url: finalImageUrl },
               },
             ],
           },
