@@ -17,13 +17,21 @@ import { toast } from '@/hooks/use-toast';
 import { Upload, X, Loader2, LayoutTemplate } from 'lucide-react';
 import { useTelegramSync } from '@/hooks/useTelegramSync';
 import { NoteTemplates } from '@/components/NoteTemplates';
+import type { Attachment, Note } from '@/types';
+import {
+  validateUploadFile,
+  MAX_NOTE_TITLE_LEN,
+  MAX_NOTE_TOPIC_LEN,
+  MAX_NOTE_LABEL_LEN,
+  MAX_NOTE_LABELS,
+} from '@/lib/sanitize';
 
 interface CreateNoteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   groupId: string;
   onSuccess: () => void;
-  editingNote?: any;
+  editingNote?: Note | null;
 }
 
 const COLORS = [
@@ -59,17 +67,20 @@ export function CreateNoteDialog({
   const [showTemplates, setShowTemplates] = useState(false);
 
   useEffect(() => {
+    // Only sync state when the dialog opens — avoids flicker on close
+    if (!open) return;
     if (editingNote) {
       setTitle(editingNote.title || '');
       setContent(editingNote.content || '');
       setLabels(editingNote.labels || []);
       setColor(editingNote.color || 'white');
-      setLectureNumber(editingNote.lecture_number || '');
-      setTopic(editingNote.topic || '');
+      setLectureNumber(((editingNote as unknown) as { lecture_number?: number | null }).lecture_number ?? '');
+      setTopic(((editingNote as unknown) as { topic?: string | null }).topic || '');
     } else {
       resetForm();
     }
-  }, [editingNote, open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editingNote?.id]);
 
   const resetForm = () => {
     setTitle('');
@@ -83,9 +94,19 @@ export function CreateNoteDialog({
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setFiles(Array.from(e.target.files));
+    if (!e.target.files) return;
+    const incoming = Array.from(e.target.files);
+    const accepted: File[] = [];
+    for (const f of incoming) {
+      const v = validateUploadFile(f);
+      if (!v.ok) {
+        toast({ title: 'File rejected', description: v.reason, variant: 'destructive' });
+        continue;
+      }
+      accepted.push(f);
     }
+    setFiles(accepted);
+    e.target.value = '';
   };
 
   const removeFile = (index: number) => {
@@ -93,10 +114,18 @@ export function CreateNoteDialog({
   };
 
   const addLabel = () => {
-    if (newLabel.trim() && !labels.includes(newLabel.trim())) {
-      setLabels([...labels, newLabel.trim()]);
-      setNewLabel('');
+    const trimmed = newLabel.trim().slice(0, MAX_NOTE_LABEL_LEN);
+    if (!trimmed) return;
+    if (labels.length >= MAX_NOTE_LABELS) {
+      toast({ title: 'Too many labels', description: `Max ${MAX_NOTE_LABELS} labels per note`, variant: 'destructive' });
+      return;
     }
+    if (labels.some(l => l.toLowerCase() === trimmed.toLowerCase())) {
+      setNewLabel('');
+      return;
+    }
+    setLabels([...labels, trimmed]);
+    setNewLabel('');
   };
 
   const removeLabel = (label: string) => {
