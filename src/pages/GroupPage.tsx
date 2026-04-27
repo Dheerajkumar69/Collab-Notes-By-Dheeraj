@@ -472,6 +472,7 @@ export default function GroupPage() {
                        size="icon"
                        onClick={() => setShowSettings(true)}
                         className="text-white hover:bg-white/20 bg-black/30 backdrop-blur-sm"
+                        aria-label="Group settings"
                      >
                        <Settings className="h-5 w-5" />
                      </Button>
@@ -480,6 +481,7 @@ export default function GroupPage() {
                        size="icon"
                        onClick={() => setShowDeleteDialog(true)}
                        className="text-white hover:bg-white/20 bg-black/30 backdrop-blur-sm"
+                        aria-label="Delete group"
                      >
                        <Trash2 className="h-5 w-5" />
                      </Button>
