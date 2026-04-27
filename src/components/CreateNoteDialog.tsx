@@ -328,7 +328,13 @@ export function CreateNoteDialog({
                 type="number"
                 min={1}
                 value={lectureNumber}
-                onChange={e => setLectureNumber(e.target.value === '' ? '' : parseInt(e.target.value))}
+                onChange={e => {
+                  const v = e.target.value;
+                  if (v === '') return setLectureNumber('');
+                  const parsed = parseInt(v, 10);
+                  if (Number.isNaN(parsed) || parsed < 1) return;
+                  setLectureNumber(parsed);
+                }}
                 placeholder="e.g. 1, 2, 3..."
               />
             </div>
@@ -406,7 +412,13 @@ export function CreateNoteDialog({
               <Input
                 value={newLabel}
                 onChange={e => setNewLabel(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addLabel())}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addLabel();
+                  }
+                }}
+                maxLength={MAX_NOTE_LABEL_LEN}
                 placeholder="Add label"
               />
               <Button onClick={addLabel} variant="outline">
