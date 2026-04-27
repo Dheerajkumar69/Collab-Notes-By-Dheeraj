@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,7 +21,9 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { QuickNoteInput } from '@/components/QuickNoteInput';
 import { FolderTree } from '@/components/FolderTree';
 import { useUserPresence, OnlineDot } from '@/components/UserPresence';
-import { ActivityFeed, logActivity } from '@/components/ActivityFeed';
+import { ActivityFeed } from '@/components/ActivityFeed';
+import { htmlToPlainText } from '@/lib/sanitize';
+import type { Attachment, EditRequest, Reaction, Profile as ProfileT } from '@/types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,23 +53,20 @@ interface Note {
   group_id: string;
   labels?: string[];
   author_name?: string | null;
-  attachments?: any;
+  attachments?: Attachment[];
   is_pinned?: boolean;
   is_archived?: boolean;
   color?: string | null;
-  edit_requests?: any;
-  reactions?: any;
+  edit_requests?: EditRequest[];
+  reactions?: Reaction[];
   created_by: string;
   created_at: string;
   lecture_number?: number | null;
   topic?: string | null;
+  folder_id?: string | null;
 }
 
-interface Profile {
-  id: string;
-  email: string;
-  full_name: string;
-}
+type Profile = ProfileT;
 
 export default function GroupPage() {
   const { id } = useParams();
