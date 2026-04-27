@@ -267,6 +267,7 @@ export function CreateNoteDialog({
               <Label>Topic</Label>
               <Input
                 value={topic}
+                maxLength={MAX_NOTE_TOPIC_LEN}
                 onChange={e => setTopic(e.target.value)}
                 placeholder="e.g. Introduction, Arrays..."
               />
@@ -277,6 +278,7 @@ export function CreateNoteDialog({
             <Label>Title *</Label>
             <Input
               value={title}
+              maxLength={MAX_NOTE_TITLE_LEN}
               onChange={e => setTitle(e.target.value)}
               placeholder="Note title"
             />
