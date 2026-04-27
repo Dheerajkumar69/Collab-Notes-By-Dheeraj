@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { MoreVertical, Pin, Edit, Trash2, Smile, Archive, ArchiveRestore, Loader2, Hash } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { NoteViewDialog } from './NoteViewDialog';
@@ -253,7 +254,7 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
               <div 
                 className="tiptap prose prose-sm dark:prose-invert max-w-none [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_p]:my-0.5" 
                 dangerouslySetInnerHTML={{ 
-                  __html: note.content.replace(/<img[^>]*>/g, '').slice(0, 500) 
+                  __html: sanitizeHtml(note.content.replace(/<img[^>]*>/g, '').slice(0, 500))
                 }} 
               />
             ) : (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,7 +21,9 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { QuickNoteInput } from '@/components/QuickNoteInput';
 import { FolderTree } from '@/components/FolderTree';
 import { useUserPresence, OnlineDot } from '@/components/UserPresence';
-import { ActivityFeed, logActivity } from '@/components/ActivityFeed';
+import { ActivityFeed } from '@/components/ActivityFeed';
+import { htmlToPlainText } from '@/lib/sanitize';
+import type { Attachment, EditRequest, Reaction, Profile as ProfileT } from '@/types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,23 +53,20 @@ interface Note {
   group_id: string;
   labels?: string[];
   author_name?: string | null;
-  attachments?: any;
+  attachments?: Attachment[];
   is_pinned?: boolean;
   is_archived?: boolean;
   color?: string | null;
-  edit_requests?: any;
-  reactions?: any;
+  edit_requests?: EditRequest[];
+  reactions?: Reaction[];
   created_by: string;
   created_at: string;
   lecture_number?: number | null;
   topic?: string | null;
+  folder_id?: string | null;
 }
 
-interface Profile {
-  id: string;
-  email: string;
-  full_name: string;
-}
+type Profile = ProfileT;
 
 export default function GroupPage() {
   const { id } = useParams();
@@ -94,35 +93,95 @@ export default function GroupPage() {
 
   const isCreator = group?.created_by === user?.id;
 
-  useEffect(() => {
-    if (id) {
-      fetchGroup();
-      fetchNotes();
-      fetchMembers();
+  // Stable fetcher refs (no deps so they don't re-create across renders)
+  const fetchGroup = useCallback(async () => {
+    if (!id) return;
+    const { data, error } = await supabase
+      .from('groups')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      // PGRST116 = no rows; treat as 404, otherwise let caller decide
+      if (error.code === 'PGRST116') {
+        setGroup(null);
+        return;
+      }
+      throw error;
     }
+    setGroup(data as unknown as Group);
   }, [id]);
 
-  const fetchGroup = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('groups')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-      setGroup(data);
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load group',
-        variant: 'destructive',
-      });
-      navigate('/dashboard');
-    } finally {
-      setLoading(false);
+  const fetchMembersFor = useCallback(async (groupRow: { members?: string[] | null; created_by: string }) => {
+    const allEmails = [...(groupRow.members || [])];
+    const memberProfiles = allEmails.length > 0
+      ? (await supabase.from('profiles').select('*').in('email', allEmails)).data || []
+      : [];
+    const { data: creatorProfile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', groupRow.created_by)
+      .single();
+    const allProfiles = [...memberProfiles] as Profile[];
+    if (creatorProfile && !allProfiles.some(p => p.id === creatorProfile.id)) {
+      allProfiles.unshift(creatorProfile as Profile);
     }
-  };
+    setMembers(allProfiles);
+  }, []);
+
+  // Combined initial loader — parallelises queries and uses a single loading state
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    setLoading(true);
+
+    (async () => {
+      try {
+        const [groupRes, notesRes] = await Promise.all([
+          supabase.from('groups').select('*').eq('id', id).single(),
+          supabase
+            .from('notes')
+            .select('*')
+            .eq('group_id', id)
+            .order('is_pinned', { ascending: false })
+            .order('lecture_number', { ascending: true, nullsFirst: false })
+            .order('created_at', { ascending: false }),
+        ]);
+
+        if (cancelled) return;
+
+        if (groupRes.error) {
+          if (groupRes.error.code === 'PGRST116') {
+            setGroup(null);
+          } else {
+            toast({ title: 'Error', description: 'Failed to load group', variant: 'destructive' });
+            navigate('/dashboard');
+            return;
+          }
+        } else {
+          setGroup(groupRes.data as unknown as Group);
+          // Reuse the freshly-fetched group row to avoid a duplicate query
+          await fetchMembersFor(groupRes.data as unknown as { members?: string[]; created_by: string });
+        }
+
+        if (notesRes.error) {
+          console.error('Error fetching notes:', notesRes.error);
+        } else {
+          setNotes((notesRes.data || []) as unknown as Note[]);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.error('GroupPage initial load failed:', e);
+          toast({ title: 'Error', description: 'Failed to load group', variant: 'destructive' });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [id, navigate, fetchMembersFor]);
 
   const fetchNotes = async () => {
     try {
@@ -135,52 +194,27 @@ export default function GroupPage() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setNotes(data || []);
+      setNotes((data || []) as unknown as Note[]);
     } catch (error: any) {
       console.error('Error fetching notes:', error);
     }
   };
 
-  const fetchMembers = async () => {
-    try {
-      const { data: groupData } = await supabase
-        .from('groups')
-        .select('members, created_by')
-        .eq('id', id)
-        .single();
-
-      if (groupData) {
-        const allEmails = [...(groupData.members || [])];
-        
-        // Fetch member profiles by email
-        const memberProfiles = allEmails.length > 0 
-          ? (await supabase.from('profiles').select('*').in('email', allEmails)).data || []
-          : [];
-        
-        // Also fetch the creator profile by ID (may not be in members array)
-        const { data: creatorProfile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', groupData.created_by)
-          .single();
-        
-        // Merge without duplicates
-        const allProfiles = [...memberProfiles];
-        if (creatorProfile && !allProfiles.some(p => p.id === creatorProfile.id)) {
-          allProfiles.unshift(creatorProfile);
-        }
-        
-        setMembers(allProfiles);
-      }
-    } catch (error: any) {
-      console.error('Error fetching members:', error);
-    }
-  };
+  const fetchMembers = useCallback(async () => {
+    if (!id) return;
+    const { data: groupData } = await supabase
+      .from('groups')
+      .select('members, created_by')
+      .eq('id', id)
+      .single();
+    if (groupData) await fetchMembersFor(groupData as { members?: string[]; created_by: string });
+  }, [id, fetchMembersFor]);
 
   const copyInviteCode = async () => {
     try {
       const { data, error } = await supabase.rpc('get_group_invite_code', { p_group_id: id });
       if (error) throw error;
+      if (!data) throw new Error('No invite code returned');
       navigator.clipboard.writeText(data);
       toast({
         title: 'Copied!',
@@ -192,74 +226,76 @@ export default function GroupPage() {
   };
 
   const handleDeleteGroup = async () => {
+    if (!id) return;
     try {
-      const { error } = await supabase.from('groups').delete().eq('id', id);
+      // Cascading delete via SECURITY DEFINER RPC — wipes notes/messages/folders/etc atomically
+      const { error } = await supabase.rpc('delete_group_cascade', { p_group_id: id });
       if (error) throw error;
 
-      toast({
-        title: 'Success',
-        description: 'Group deleted successfully',
-      });
+      toast({ title: 'Success', description: 'Group deleted successfully' });
       navigate('/dashboard');
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: 'Failed to delete group',
+        description: error?.message || 'Failed to delete group',
         variant: 'destructive',
       });
     }
   };
 
   const handleRemoveMember = async (email: string) => {
+    if (!id) return;
     try {
-      const updatedMembers = group?.members?.filter(m => m !== email) || [];
-      const { error } = await supabase
-        .from('groups')
-        .update({ members: updatedMembers })
-        .eq('id', id);
-
+      // Atomic array_remove via RPC — eliminates TOCTOU race when two admins act concurrently
+      const { error } = await supabase.rpc('remove_group_member', {
+        p_group_id: id,
+        p_email: email,
+      });
       if (error) throw error;
 
-      toast({
-        title: 'Success',
-        description: 'Member removed successfully',
-      });
-      fetchMembers();
-      fetchGroup();
+      toast({ title: 'Success', description: 'Member removed successfully' });
+      await Promise.all([fetchMembers(), fetchGroup()]);
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: 'Failed to remove member',
+        description: error?.message || 'Failed to remove member',
         variant: 'destructive',
       });
     }
   };
 
-  const allLabels = Array.from(
-    new Set(notes.flatMap(note => note.labels || []))
+  const allLabels = useMemo(
+    () => Array.from(new Set(notes.flatMap(note => note.labels || []))),
+    [notes]
   );
 
-  const filteredNotes = notes.filter(note => {
-    if (note.is_archived) return false;
-    const matchesSearch =
-      note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      note.content?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesLabel =
-      selectedLabel === 'All' || note.labels?.includes(selectedLabel);
-    const matchesFolder =
-      selectedFolderId === null || (note as any).folder_id === selectedFolderId;
-    return matchesSearch && matchesLabel && matchesFolder;
-  });
+  const filteredNotes = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return notes.filter(note => {
+      if (note.is_archived) return false;
+      if (q) {
+        const titleMatch = note.title.toLowerCase().includes(q);
+        // Search visible text, not raw HTML markup
+        const contentText = note.content ? htmlToPlainText(note.content).toLowerCase() : '';
+        if (!titleMatch && !contentText.includes(q)) return false;
+      }
+      if (selectedLabel !== 'All' && !note.labels?.includes(selectedLabel)) return false;
+      if (selectedFolderId !== null && note.folder_id !== selectedFolderId) return false;
+      return true;
+    });
+  }, [notes, searchTerm, selectedLabel, selectedFolderId]);
 
-  // Compute note counts per folder
-  const noteCountByFolder: Record<string, number> = {};
-  notes.filter(n => !n.is_archived).forEach(note => {
-    const fid = (note as any).folder_id;
-    if (fid) {
-      noteCountByFolder[fid] = (noteCountByFolder[fid] || 0) + 1;
+  // Compute note counts per folder (memoized)
+  const { noteCountByFolder, totalUnfoldered } = useMemo(() => {
+    const counts: Record<string, number> = {};
+    let unfoldered = 0;
+    for (const n of notes) {
+      if (n.is_archived) continue;
+      if (n.folder_id) counts[n.folder_id] = (counts[n.folder_id] || 0) + 1;
+      else unfoldered += 1;
     }
-  });
-  const totalUnfoldered = notes.filter(n => !n.is_archived && !(n as any).folder_id).length;
+    return { noteCountByFolder: counts, totalUnfoldered: unfoldered };
+  }, [notes]);
 
   const getColorClass = (color?: string) => {
     switch (color) {
@@ -273,8 +309,9 @@ export default function GroupPage() {
     }
   };
 
-  const pendingEditRequests = notes.filter(note =>
-    note.edit_requests?.some((req: any) => req.status === 'pending')
+  const pendingEditRequests = useMemo(
+    () => notes.filter(note => note.edit_requests?.some(req => req.status === 'pending')),
+    [notes]
   );
 
   const renderNotesPanel = () => (
@@ -435,6 +472,7 @@ export default function GroupPage() {
                        size="icon"
                        onClick={() => setShowSettings(true)}
                         className="text-white hover:bg-white/20 bg-black/30 backdrop-blur-sm"
+                        aria-label="Group settings"
                      >
                        <Settings className="h-5 w-5" />
                      </Button>
@@ -443,6 +481,7 @@ export default function GroupPage() {
                        size="icon"
                        onClick={() => setShowDeleteDialog(true)}
                        className="text-white hover:bg-white/20 bg-black/30 backdrop-blur-sm"
+                        aria-label="Delete group"
                      >
                        <Trash2 className="h-5 w-5" />
                      </Button>
