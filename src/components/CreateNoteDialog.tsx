@@ -133,7 +133,8 @@ export function CreateNoteDialog({
   };
 
   const handleSubmit = async () => {
-    if (!title.trim()) {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
       toast({
         title: 'Error',
         description: 'Please enter a title',
@@ -141,23 +142,44 @@ export function CreateNoteDialog({
       });
       return;
     }
+    if (trimmedTitle.length > MAX_NOTE_TITLE_LEN) {
+      toast({ title: 'Title too long', description: `Max ${MAX_NOTE_TITLE_LEN} characters`, variant: 'destructive' });
+      return;
+    }
+    if (topic.trim().length > MAX_NOTE_TOPIC_LEN) {
+      toast({ title: 'Topic too long', description: `Max ${MAX_NOTE_TOPIC_LEN} characters`, variant: 'destructive' });
+      return;
+    }
+    if (!user?.id) {
+      toast({ title: 'Not signed in', description: 'Please sign in again', variant: 'destructive' });
+      return;
+    }
 
+    // Track newly uploaded paths so we can roll them back on DB failure
+    const newlyUploadedPaths: string[] = [];
     try {
       setUploading(true);
-      let attachments: any[] = editingNote?.attachments || [];
+      let attachments: Array<Attachment & { path?: string; size?: number }> =
+        ((editingNote?.attachments as Attachment[] | undefined) || []).map(a => ({ ...a }));
+      let ocrAppendText = '';
 
       // Upload files
       if (files.length > 0) {
         const uploadPromises = files.map(async file => {
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${Math.random()}.${fileExt}`;
-          const filePath = `${user?.id}/${fileName}`;
+          const v = validateUploadFile(file);
+          if (!v.ok) throw new Error(v.reason);
+          const rawExt = (file.name.split('.').pop() || 'bin').toLowerCase();
+          const safeExt = rawExt.replace(/[^a-z0-9]/g, '').slice(0, 8) || 'bin';
+          const fileName = `${crypto.randomUUID()}.${safeExt}`;
+          // Path is keyed by GROUP id so RLS policies match group membership
+          const filePath = `${groupId}/${fileName}`;
 
-          const { error: uploadError, data } = await supabase.storage
+          const { error: uploadError } = await supabase.storage
             .from('note-attachments')
             .upload(filePath, file);
 
           if (uploadError) throw uploadError;
+          newlyUploadedPaths.push(filePath);
 
           const { data: signedUrlData } = await supabase.storage
             .from('note-attachments')
@@ -165,6 +187,7 @@ export function CreateNoteDialog({
 
           return {
             url: signedUrlData?.signedUrl || '',
+            path: filePath,
             name: file.name,
             type: file.type,
             size: file.size,
@@ -174,42 +197,51 @@ export function CreateNoteDialog({
         const uploadedFiles = await Promise.all(uploadPromises);
         attachments = [...attachments, ...uploadedFiles];
 
-        // OCR for images using edge function
+        // OCR for images using edge function — parallel + accumulate locally.
+        // (state setters are async, so we cannot rely on `content` being updated
+        // before we build noteData below — we must use a local string.)
         setProcessing(true);
-        for (const file of uploadedFiles) {
-          if (file.type.startsWith('image/')) {
-            try {
-              const { data: ocrData, error: ocrError } = await supabase.functions.invoke('ocr-extract', {
-                body: { imageUrl: file.url },
-              });
-
-              if (!ocrError && ocrData?.extractedText) {
-                setContent(prev => prev + '\n\n' + ocrData.extractedText);
-              }
-            } catch (error) {
-              console.error('OCR error:', error);
-            }
+        const imageFiles = uploadedFiles.filter(f => f.type.startsWith('image/'));
+        const ocrResults = await Promise.allSettled(
+          imageFiles.map(f =>
+            supabase.functions.invoke('ocr-extract', {
+              body: { storagePath: f.path },
+            })
+          )
+        );
+        for (const r of ocrResults) {
+          if (r.status === 'fulfilled') {
+            const txt = (r.value as { data?: { extractedText?: string } })?.data?.extractedText;
+            if (txt && typeof txt === 'string') ocrAppendText += '\n\n' + txt;
+          } else {
+            console.error('OCR error:', r.reason);
           }
         }
       }
+
+      const finalContent = ocrAppendText ? content + ocrAppendText : content;
+      if (ocrAppendText) setContent(finalContent);
 
       // Get user profile for author name
       const { data: profile } = await supabase
         .from('profiles')
         .select('full_name')
-        .eq('id', user?.id)
+        .eq('id', user.id)
         .single();
 
       const noteData = {
-        title,
-        content,
+        title: trimmedTitle,
+        content: finalContent,
         group_id: groupId,
         labels,
         color,
         attachments,
         author_name: profile?.full_name || 'User',
-        created_by: user?.id,
-        lecture_number: lectureNumber === '' ? null : lectureNumber,
+        created_by: user.id,
+        lecture_number:
+          lectureNumber === '' || Number.isNaN(lectureNumber as number)
+            ? null
+            : (lectureNumber as number),
         topic: topic.trim() || null,
       };
 
@@ -252,9 +284,17 @@ export function CreateNoteDialog({
       onSuccess();
     } catch (error: any) {
       console.error('Error saving note:', error);
+      // Roll back any newly uploaded files so we don't leak orphans
+      if (newlyUploadedPaths.length > 0) {
+        try {
+          await supabase.storage.from('note-attachments').remove(newlyUploadedPaths);
+        } catch (cleanupErr) {
+          console.error('Failed to clean up uploaded files:', cleanupErr);
+        }
+      }
       toast({
         title: 'Error',
-        description: 'Failed to save note',
+        description: error?.message || 'Failed to save note',
         variant: 'destructive',
       });
     } finally {
