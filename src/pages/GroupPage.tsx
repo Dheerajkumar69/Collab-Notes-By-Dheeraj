@@ -134,7 +134,7 @@ export default function GroupPage() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setNotes(data || []);
+      setNotes((data || []) as unknown as Note[]);
     } catch (error: any) {
       console.error('Error fetching notes:', error);
     }
