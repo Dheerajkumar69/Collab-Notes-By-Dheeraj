@@ -253,7 +253,7 @@ export function NoteCard({ note, onUpdate, onEdit, isCreator }: NoteCardProps) {
               <div 
                 className="tiptap prose prose-sm dark:prose-invert max-w-none [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_p]:my-0.5" 
                 dangerouslySetInnerHTML={{ 
-                  __html: note.content.replace(/<img[^>]*>/g, '').slice(0, 500) 
+                  __html: sanitizeHtml(note.content.replace(/<img[^>]*>/g, '').slice(0, 500))
                 }} 
               />
             ) : (
