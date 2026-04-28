@@ -633,7 +633,7 @@ export type Database = {
         Returns: boolean
       }
       join_group_with_code: {
-        Args: { p_invite_code: string; p_user_email: string }
+        Args: { p_invite_code: string; p_user_email?: string }
         Returns: Json
       }
       remove_group_member: {
