@@ -3,8 +3,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
@@ -26,26 +26,10 @@ export const JoinGroupDialog = ({ open, onOpenChange, onSuccess }: JoinGroupDial
 
     setLoading(true);
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile) {
-      toast({
-        title: 'Error',
-        description: 'User profile not found',
-        variant: 'destructive',
-      });
-      setLoading(false);
-      return;
-    }
-
-    // Call the secure database function to join the group
+    // Email is derived server-side from auth.uid(); client value is ignored.
     const { data, error } = await supabase.rpc('join_group_with_code', {
       p_invite_code: inviteCode.toUpperCase(),
-      p_user_email: profile.email,
+      p_user_email: '',
     });
 
     setLoading(false);
