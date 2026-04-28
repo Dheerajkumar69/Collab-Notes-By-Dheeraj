@@ -145,6 +145,32 @@ export type Database = {
           },
         ]
       }
+      group_invite_codes: {
+        Row: {
+          created_at: string
+          group_id: string
+          invite_code: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          invite_code: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          invite_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_invite_codes_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: true
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       groups: {
         Row: {
           background_image_url: string | null
@@ -153,7 +179,6 @@ export type Database = {
           created_by: string
           description: string | null
           id: string
-          invite_code: string
           members: string[] | null
           name: string
         }
@@ -164,7 +189,6 @@ export type Database = {
           created_by: string
           description?: string | null
           id?: string
-          invite_code: string
           members?: string[] | null
           name: string
         }
@@ -175,7 +199,6 @@ export type Database = {
           created_by?: string
           description?: string | null
           id?: string
-          invite_code?: string
           members?: string[] | null
           name?: string
         }

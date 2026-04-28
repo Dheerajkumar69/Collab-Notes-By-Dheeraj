@@ -58,7 +58,6 @@ export const useCreateGroup = () => {
           description: newGroup.description,
           color: newGroup.color,
           background_image_url: newGroup.background_image_url,
-          invite_code: inviteCode,
           members: [profile.email],
           created_by: user.id,
         }])
@@ -66,6 +65,12 @@ export const useCreateGroup = () => {
         .single();
 
       if (error) throw error;
+
+      const { error: codeError } = await supabase
+        .from('group_invite_codes')
+        .insert({ group_id: data.id, invite_code: inviteCode });
+      if (codeError) throw codeError;
+
       return data;
     },
     onSuccess: () => {
