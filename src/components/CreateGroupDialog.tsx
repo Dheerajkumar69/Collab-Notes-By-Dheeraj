@@ -74,14 +74,13 @@ export const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroup
 
     const inviteCode = generateInviteCode();
 
-    const { error } = await supabase.from('groups').insert({
+    const { data: newGroup, error } = await supabase.from('groups').insert({
       name: data.name,
       description: data.description,
       color: data.color,
-      invite_code: inviteCode,
       members: [profile.email],
       created_by: user.id,
-    });
+    }).select('id').single();
 
     setLoading(false);
 
@@ -92,6 +91,10 @@ export const CreateGroupDialog = ({ open, onOpenChange, onSuccess }: CreateGroup
         variant: 'destructive',
       });
     } else {
+      await supabase.from('group_invite_codes').insert({
+        group_id: newGroup.id,
+        invite_code: inviteCode,
+      });
       toast({
         title: 'Success',
         description: 'Group created successfully',

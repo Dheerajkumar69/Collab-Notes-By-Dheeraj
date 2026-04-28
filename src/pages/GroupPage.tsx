@@ -41,7 +41,6 @@ interface Group {
   description?: string;
   color?: string;
   members?: string[];
-  invite_code: string;
   background_image_url?: string;
   created_by: string;
 }
