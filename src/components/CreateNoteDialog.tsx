@@ -515,6 +515,11 @@ export function CreateNoteDialog({
                       label = msg || 'Error';
                       cls = 'text-destructive';
                       break;
+                    case 'cancelled':
+                      icon = <Ban className="h-3.5 w-3.5" />;
+                      label = msg || 'Cancelled';
+                      cls = 'text-muted-foreground';
+                      break;
                     default:
                       icon = isOcrTarget ? (
                         <ScanText className="h-3.5 w-3.5" />
@@ -535,14 +540,28 @@ export function CreateNoteDialog({
                           {label}
                         </span>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={s === 'uploading' || s === 'ocr'}
-                        onClick={() => removeFile(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        {s === 'ocr' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-destructive"
+                            onClick={() => cancelOcr(file)}
+                            title="Cancel transcription"
+                          >
+                            <Ban className="h-3.5 w-3.5" />
+                            Cancel
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={s === 'uploading' || s === 'ocr'}
+                          onClick={() => removeFile(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   );
                 })}
