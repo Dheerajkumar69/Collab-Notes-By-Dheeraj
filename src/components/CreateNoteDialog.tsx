@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Upload, X, Loader2, LayoutTemplate, CheckCircle2, AlertCircle, ScanText, FileText, Ban } from 'lucide-react';
+import { Upload, X, Loader2, LayoutTemplate, CheckCircle2, AlertCircle, ScanText, FileText, Ban, ChevronDown, ChevronRight } from 'lucide-react';
 import { useTelegramSync } from '@/hooks/useTelegramSync';
 import { NoteTemplates } from '@/components/NoteTemplates';
 import type { Attachment, Note } from '@/types';
@@ -64,6 +64,9 @@ export function CreateNoteDialog({
   const [processing, setProcessing] = useState(false);
   type FileStatus = 'pending' | 'uploading' | 'ocr' | 'done' | 'skipped' | 'error' | 'cancelled';
   const [fileStatuses, setFileStatuses] = useState<Record<string, { status: FileStatus; message?: string }>>({});
+  // Extracted OCR text per file, for the collapsible preview
+  const [fileOcrText, setFileOcrText] = useState<Record<string, string>>({});
+  const [expandedPreviews, setExpandedPreviews] = useState<Record<string, boolean>>({});
   // AbortControllers keyed by `${name}:${size}` so users can cancel an in-flight OCR call
   const ocrAbortersRef = useRef<Record<string, AbortController>>({});
   const [lectureNumber, setLectureNumber] = useState<number | ''>('');
@@ -94,6 +97,8 @@ export function CreateNoteDialog({
     setColor('white');
     setFiles([]);
     setFileStatuses({});
+    setFileOcrText({});
+    setExpandedPreviews({});
     // Abort any in-flight OCR requests when the form is reset
     Object.values(ocrAbortersRef.current).forEach(c => {
       try { c.abort(); } catch { /* ignore */ }
@@ -119,6 +124,8 @@ export function CreateNoteDialog({
     setFileStatuses(
       Object.fromEntries(accepted.map(f => [`${f.name}:${f.size}`, { status: 'pending' as FileStatus }]))
     );
+    setFileOcrText({});
+    setExpandedPreviews({});
     e.target.value = '';
   };
 
@@ -133,6 +140,16 @@ export function CreateNoteDialog({
         delete ocrAbortersRef.current[key];
       }
       setFileStatuses(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      setFileOcrText(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      setExpandedPreviews(prev => {
         const next = { ...prev };
         delete next[key];
         return next;
@@ -297,6 +314,8 @@ export function CreateNoteDialog({
             if (txt && typeof txt === 'string' && txt.trim()) {
               ocrAppendText += '\n\n' + txt;
               setFileStatus(target._file, 'done', 'Transcribed');
+              setFileOcrText(prev => ({ ...prev, [key]: txt }));
+              setExpandedPreviews(prev => ({ ...prev, [key]: false }));
             } else {
               setFileStatus(target._file, 'done', 'No text found');
             }
@@ -528,11 +547,11 @@ export function CreateNoteDialog({
                       );
                       label = isOcrTarget ? 'Ready to transcribe' : 'Ready';
                   }
+                  const ocrText = fileOcrText[key];
+                  const expanded = !!expandedPreviews[key];
                   return (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between gap-2 p-2 bg-muted rounded-lg"
-                    >
+                    <div key={index} className="bg-muted rounded-lg">
+                    <div className="flex items-center justify-between gap-2 p-2">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span className="text-sm truncate">{file.name}</span>
                         <span className={`flex items-center gap-1 text-xs whitespace-nowrap ${cls}`}>
@@ -541,6 +560,24 @@ export function CreateNoteDialog({
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
+                        {ocrText && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs gap-1"
+                            onClick={() =>
+                              setExpandedPreviews(prev => ({ ...prev, [key]: !prev[key] }))
+                            }
+                            title={expanded ? 'Hide extracted text' : 'Show extracted text'}
+                          >
+                            {expanded ? (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            )}
+                            Preview
+                          </Button>
+                        )}
                         {s === 'ocr' && (
                           <Button
                             variant="ghost"
@@ -562,6 +599,32 @@ export function CreateNoteDialog({
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
+                    </div>
+                    {ocrText && expanded && (
+                      <div className="border-t border-border/50 px-3 py-2">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Extracted text ({ocrText.length.toLocaleString()} chars)
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => {
+                              navigator.clipboard.writeText(ocrText).then(
+                                () => toast({ title: 'Copied', description: 'Extracted text copied to clipboard' }),
+                                () => toast({ title: 'Copy failed', variant: 'destructive' }),
+                              );
+                            }}
+                          >
+                            Copy
+                          </Button>
+                        </div>
+                        <pre className="text-xs whitespace-pre-wrap break-words max-h-40 overflow-y-auto bg-background/50 rounded p-2 font-mono">
+                          {ocrText}
+                        </pre>
+                      </div>
+                    )}
                     </div>
                   );
                 })}
