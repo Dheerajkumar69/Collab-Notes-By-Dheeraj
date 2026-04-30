@@ -124,6 +124,8 @@ export function CreateNoteDialog({
     setFileStatuses(
       Object.fromEntries(accepted.map(f => [`${f.name}:${f.size}`, { status: 'pending' as FileStatus }]))
     );
+    setFileOcrText({});
+    setExpandedPreviews({});
     e.target.value = '';
   };
 
@@ -138,6 +140,16 @@ export function CreateNoteDialog({
         delete ocrAbortersRef.current[key];
       }
       setFileStatuses(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      setFileOcrText(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      setExpandedPreviews(prev => {
         const next = { ...prev };
         delete next[key];
         return next;
