@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Upload, X, Loader2, LayoutTemplate, CheckCircle2, AlertCircle, ScanText, FileText } from 'lucide-react';
+import { Upload, X, Loader2, LayoutTemplate, CheckCircle2, AlertCircle, ScanText, FileText, Ban } from 'lucide-react';
 import { useTelegramSync } from '@/hooks/useTelegramSync';
 import { NoteTemplates } from '@/components/NoteTemplates';
 import type { Attachment, Note } from '@/types';
@@ -62,8 +62,10 @@ export function CreateNoteDialog({
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
-  type FileStatus = 'pending' | 'uploading' | 'ocr' | 'done' | 'skipped' | 'error';
+  type FileStatus = 'pending' | 'uploading' | 'ocr' | 'done' | 'skipped' | 'error' | 'cancelled';
   const [fileStatuses, setFileStatuses] = useState<Record<string, { status: FileStatus; message?: string }>>({});
+  // AbortControllers keyed by `${name}:${size}` so users can cancel an in-flight OCR call
+  const ocrAbortersRef = useRef<Record<string, AbortController>>({});
   const [lectureNumber, setLectureNumber] = useState<number | ''>('');
   const [topic, setTopic] = useState('');
   const [showTemplates, setShowTemplates] = useState(false);
@@ -92,6 +94,11 @@ export function CreateNoteDialog({
     setColor('white');
     setFiles([]);
     setFileStatuses({});
+    // Abort any in-flight OCR requests when the form is reset
+    Object.values(ocrAbortersRef.current).forEach(c => {
+      try { c.abort(); } catch { /* ignore */ }
+    });
+    ocrAbortersRef.current = {};
     setLectureNumber('');
     setTopic('');
   };
@@ -119,12 +126,28 @@ export function CreateNoteDialog({
     const removed = files[index];
     setFiles(files.filter((_, i) => i !== index));
     if (removed) {
+      const key = `${removed.name}:${removed.size}`;
+      const ctl = ocrAbortersRef.current[key];
+      if (ctl) {
+        try { ctl.abort(); } catch { /* ignore */ }
+        delete ocrAbortersRef.current[key];
+      }
       setFileStatuses(prev => {
         const next = { ...prev };
-        delete next[`${removed.name}:${removed.size}`];
+        delete next[key];
         return next;
       });
     }
+  };
+
+  const cancelOcr = (file: File) => {
+    const key = `${file.name}:${file.size}`;
+    const ctl = ocrAbortersRef.current[key];
+    if (ctl) {
+      try { ctl.abort(); } catch { /* ignore */ }
+      delete ocrAbortersRef.current[key];
+    }
+    setFileStatus(file, 'cancelled', 'Transcription cancelled');
   };
 
   const setFileStatus = (file: File, status: FileStatus, message?: string) => {
@@ -240,14 +263,35 @@ export function CreateNoteDialog({
           }
         }
         const ocrResults = await Promise.allSettled(
-          ocrTargets.map(f =>
-            supabase.functions.invoke('ocr-extract', {
-              body: { storagePath: f.path },
-            })
-          )
+          ocrTargets.map(f => {
+            const key = `${f._file.name}:${f._file.size}`;
+            const controller = new AbortController();
+            ocrAbortersRef.current[key] = controller;
+            return supabase.functions
+              .invoke('ocr-extract', {
+                body: { storagePath: f.path },
+              } as Parameters<typeof supabase.functions.invoke>[1] & { signal?: AbortSignal })
+              .then(
+                v => {
+                  if (controller.signal.aborted) {
+                    throw new DOMException('Aborted', 'AbortError');
+                  }
+                  return v;
+                },
+                e => { throw e; },
+              )
+              .finally(() => {
+                if (ocrAbortersRef.current[key] === controller) {
+                  delete ocrAbortersRef.current[key];
+                }
+              });
+          })
         );
         ocrResults.forEach((r, idx) => {
           const target = ocrTargets[idx];
+          const key = `${target._file.name}:${target._file.size}`;
+          // If the user cancelled this file, leave its 'cancelled' status alone
+          if (fileStatuses[key]?.status === 'cancelled') return;
           if (r.status === 'fulfilled') {
             const txt = (r.value as { data?: { extractedText?: string } })?.data?.extractedText;
             if (txt && typeof txt === 'string' && txt.trim()) {
@@ -257,6 +301,11 @@ export function CreateNoteDialog({
               setFileStatus(target._file, 'done', 'No text found');
             }
           } else {
+            const reason = (r.reason as { name?: string; message?: string }) || {};
+            if (reason.name === 'AbortError') {
+              setFileStatus(target._file, 'cancelled', 'Transcription cancelled');
+              return;
+            }
             console.error('OCR error:', r.reason);
             setFileStatus(target._file, 'error', 'Transcription failed');
           }
