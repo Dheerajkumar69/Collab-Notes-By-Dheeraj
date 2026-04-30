@@ -314,6 +314,8 @@ export function CreateNoteDialog({
             if (txt && typeof txt === 'string' && txt.trim()) {
               ocrAppendText += '\n\n' + txt;
               setFileStatus(target._file, 'done', 'Transcribed');
+              setFileOcrText(prev => ({ ...prev, [key]: txt }));
+              setExpandedPreviews(prev => ({ ...prev, [key]: false }));
             } else {
               setFileStatus(target._file, 'done', 'No text found');
             }
