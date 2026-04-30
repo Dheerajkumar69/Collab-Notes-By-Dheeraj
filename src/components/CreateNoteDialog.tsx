@@ -547,11 +547,11 @@ export function CreateNoteDialog({
                       );
                       label = isOcrTarget ? 'Ready to transcribe' : 'Ready';
                   }
+                  const ocrText = fileOcrText[key];
+                  const expanded = !!expandedPreviews[key];
                   return (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between gap-2 p-2 bg-muted rounded-lg"
-                    >
+                    <div key={index} className="bg-muted rounded-lg">
+                    <div className="flex items-center justify-between gap-2 p-2">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span className="text-sm truncate">{file.name}</span>
                         <span className={`flex items-center gap-1 text-xs whitespace-nowrap ${cls}`}>
@@ -560,6 +560,24 @@ export function CreateNoteDialog({
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
+                        {ocrText && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs gap-1"
+                            onClick={() =>
+                              setExpandedPreviews(prev => ({ ...prev, [key]: !prev[key] }))
+                            }
+                            title={expanded ? 'Hide extracted text' : 'Show extracted text'}
+                          >
+                            {expanded ? (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            )}
+                            Preview
+                          </Button>
+                        )}
                         {s === 'ocr' && (
                           <Button
                             variant="ghost"
@@ -581,6 +599,32 @@ export function CreateNoteDialog({
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
+                    </div>
+                    {ocrText && expanded && (
+                      <div className="border-t border-border/50 px-3 py-2">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Extracted text ({ocrText.length.toLocaleString()} chars)
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => {
+                              navigator.clipboard.writeText(ocrText).then(
+                                () => toast({ title: 'Copied', description: 'Extracted text copied to clipboard' }),
+                                () => toast({ title: 'Copy failed', variant: 'destructive' }),
+                              );
+                            }}
+                          >
+                            Copy
+                          </Button>
+                        </div>
+                        <pre className="text-xs whitespace-pre-wrap break-words max-h-40 overflow-y-auto bg-background/50 rounded p-2 font-mono">
+                          {ocrText}
+                        </pre>
+                      </div>
+                    )}
                     </div>
                   );
                 })}
