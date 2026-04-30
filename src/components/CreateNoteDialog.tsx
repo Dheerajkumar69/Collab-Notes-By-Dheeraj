@@ -197,13 +197,15 @@ export function CreateNoteDialog({
         const uploadedFiles = await Promise.all(uploadPromises);
         attachments = [...attachments, ...uploadedFiles];
 
-        // OCR for images using edge function — parallel + accumulate locally.
+        // OCR for images and PDFs using edge function — parallel + accumulate locally.
         // (state setters are async, so we cannot rely on `content` being updated
         // before we build noteData below — we must use a local string.)
         setProcessing(true);
-        const imageFiles = uploadedFiles.filter(f => f.type.startsWith('image/'));
+        const ocrTargets = uploadedFiles.filter(
+          f => f.type.startsWith('image/') || f.type === 'application/pdf'
+        );
         const ocrResults = await Promise.allSettled(
-          imageFiles.map(f =>
+          ocrTargets.map(f =>
             supabase.functions.invoke('ocr-extract', {
               body: { storagePath: f.path },
             })
@@ -374,7 +376,7 @@ export function CreateNoteDialog({
               <label className="flex items-center gap-2 cursor-pointer border-2 border-dashed rounded-lg p-4 hover:border-primary transition-colors">
                 <Upload className="h-5 w-5 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
-                  Upload files (images will be OCR processed)
+                  Upload files (images & PDFs are auto-transcribed; originals are kept)
                 </span>
                 <input
                   type="file"
