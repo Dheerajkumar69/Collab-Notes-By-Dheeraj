@@ -36,8 +36,22 @@ const USER_PROMPT = `Transcribe every word visible in this image with maximum ac
 Pay extra attention to handwriting — read each stroke carefully. Preserve layout.
 Return ONLY the transcribed text.`;
 
+const PDF_USER_PROMPT = `Transcribe every word visible across ALL pages of this document
+with maximum accuracy. Pay extra attention to handwritten content — read each stroke
+carefully. Preserve layout, page order, lists, tables, and equations. Return ONLY the
+transcribed text (no page markers unless meaningful).`;
+
 // Retry helper with exponential backoff for transient gateway errors (429/5xx).
-async function callGateway(model: string, imageUrl: string, attempt = 0): Promise<Response> {
+async function callGateway(
+  model: string,
+  fileUrl: string,
+  mimeType: string,
+  attempt = 0
+): Promise<Response> {
+  const isPdf = mimeType === "application/pdf";
+  const userText = isPdf ? PDF_USER_PROMPT : USER_PROMPT;
+  // Gemini accepts both images and PDFs via the OpenAI-compatible image_url field
+  // when the URL serves the right Content-Type. The gateway forwards the URL as-is.
   const resp = await fetch(GATEWAY_URL, {
     method: "POST",
     headers: {
@@ -51,8 +65,8 @@ async function callGateway(model: string, imageUrl: string, attempt = 0): Promis
         {
           role: "user",
           content: [
-            { type: "text", text: USER_PROMPT },
-            { type: "image_url", image_url: { url: imageUrl } },
+            { type: "text", text: userText },
+            { type: "image_url", image_url: { url: fileUrl } },
           ],
         },
       ],
@@ -65,7 +79,7 @@ async function callGateway(model: string, imageUrl: string, attempt = 0): Promis
   if ((resp.status === 429 || resp.status >= 500) && attempt < 2) {
     const delay = 500 * Math.pow(2, attempt);
     await new Promise((r) => setTimeout(r, delay));
-    return callGateway(model, imageUrl, attempt + 1);
+    return callGateway(model, fileUrl, mimeType, attempt + 1);
   }
   return resp;
 }
@@ -103,6 +117,7 @@ Deno.serve(async (req) => {
     const { imageUrl, storagePath } = await req.json();
 
     let finalImageUrl: string | undefined = typeof imageUrl === "string" ? imageUrl : undefined;
+    let mimeType = "image/*";
 
     // Preferred path: caller passes a storage path; we mint a short-lived signed URL server-side
     if (typeof storagePath === "string" && storagePath.length > 0) {
@@ -120,6 +135,13 @@ Deno.serve(async (req) => {
         );
       }
       finalImageUrl = signed.signedUrl;
+      // Infer mime from extension; fall back to image
+      const lower = storagePath.toLowerCase();
+      if (lower.endsWith(".pdf")) mimeType = "application/pdf";
+      else if (lower.endsWith(".png")) mimeType = "image/png";
+      else if (lower.endsWith(".webp")) mimeType = "image/webp";
+      else if (lower.endsWith(".heic") || lower.endsWith(".heif")) mimeType = "image/heic";
+      else if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) mimeType = "image/jpeg";
     }
 
     if (!finalImageUrl) {
@@ -130,7 +152,7 @@ Deno.serve(async (req) => {
     }
 
     // Try the high-accuracy model first, then fall back to flash on failure.
-    let response = await callGateway(PRIMARY_MODEL, finalImageUrl);
+    let response = await callGateway(PRIMARY_MODEL, finalImageUrl, mimeType);
     let usedModel = PRIMARY_MODEL;
 
     if (!response.ok) {
@@ -146,7 +168,7 @@ Deno.serve(async (req) => {
       }
 
       // Any other failure — fall back to the cheaper/faster model
-      response = await callGateway(FALLBACK_MODEL, finalImageUrl);
+      response = await callGateway(FALLBACK_MODEL, finalImageUrl, mimeType);
       usedModel = FALLBACK_MODEL;
     }
 
