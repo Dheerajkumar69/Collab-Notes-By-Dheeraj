@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Upload, X, Loader2, LayoutTemplate } from 'lucide-react';
+import { Upload, X, Loader2, LayoutTemplate, CheckCircle2, AlertCircle, ScanText, FileText } from 'lucide-react';
 import { useTelegramSync } from '@/hooks/useTelegramSync';
 import { NoteTemplates } from '@/components/NoteTemplates';
 import type { Attachment, Note } from '@/types';
@@ -62,6 +62,8 @@ export function CreateNoteDialog({
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  type FileStatus = 'pending' | 'uploading' | 'ocr' | 'done' | 'skipped' | 'error';
+  const [fileStatuses, setFileStatuses] = useState<Record<string, { status: FileStatus; message?: string }>>({});
   const [lectureNumber, setLectureNumber] = useState<number | ''>('');
   const [topic, setTopic] = useState('');
   const [showTemplates, setShowTemplates] = useState(false);
@@ -89,6 +91,7 @@ export function CreateNoteDialog({
     setNewLabel('');
     setColor('white');
     setFiles([]);
+    setFileStatuses({});
     setLectureNumber('');
     setTopic('');
   };
@@ -106,11 +109,29 @@ export function CreateNoteDialog({
       accepted.push(f);
     }
     setFiles(accepted);
+    setFileStatuses(
+      Object.fromEntries(accepted.map(f => [`${f.name}:${f.size}`, { status: 'pending' as FileStatus }]))
+    );
     e.target.value = '';
   };
 
   const removeFile = (index: number) => {
+    const removed = files[index];
     setFiles(files.filter((_, i) => i !== index));
+    if (removed) {
+      setFileStatuses(prev => {
+        const next = { ...prev };
+        delete next[`${removed.name}:${removed.size}`];
+        return next;
+      });
+    }
+  };
+
+  const setFileStatus = (file: File, status: FileStatus, message?: string) => {
+    setFileStatuses(prev => ({
+      ...prev,
+      [`${file.name}:${file.size}`]: { status, message },
+    }));
   };
 
   const addLabel = () => {
@@ -168,6 +189,7 @@ export function CreateNoteDialog({
         const uploadPromises = files.map(async file => {
           const v = validateUploadFile(file);
           if (!v.ok) throw new Error(v.reason);
+          setFileStatus(file, 'uploading');
           const rawExt = (file.name.split('.').pop() || 'bin').toLowerCase();
           const safeExt = rawExt.replace(/[^a-z0-9]/g, '').slice(0, 8) || 'bin';
           const fileName = `${crypto.randomUUID()}.${safeExt}`;
@@ -178,12 +200,18 @@ export function CreateNoteDialog({
             .from('note-attachments')
             .upload(filePath, file);
 
-          if (uploadError) throw uploadError;
+          if (uploadError) {
+            setFileStatus(file, 'error', uploadError.message);
+            throw uploadError;
+          }
           newlyUploadedPaths.push(filePath);
 
           const { data: signedUrlData } = await supabase.storage
             .from('note-attachments')
             .createSignedUrl(filePath, 60 * 60 * 24 * 365);
+
+          const isOcrTarget = file.type.startsWith('image/') || file.type === 'application/pdf';
+          setFileStatus(file, isOcrTarget ? 'ocr' : 'done');
 
           return {
             url: signedUrlData?.signedUrl || '',
@@ -191,11 +219,12 @@ export function CreateNoteDialog({
             name: file.name,
             type: file.type,
             size: file.size,
+            _file: file,
           };
         });
 
         const uploadedFiles = await Promise.all(uploadPromises);
-        attachments = [...attachments, ...uploadedFiles];
+        attachments = [...attachments, ...uploadedFiles.map(({ _file, ...rest }) => rest)];
 
         // OCR for images and PDFs using edge function — parallel + accumulate locally.
         // (state setters are async, so we cannot rely on `content` being updated
@@ -204,6 +233,12 @@ export function CreateNoteDialog({
         const ocrTargets = uploadedFiles.filter(
           f => f.type.startsWith('image/') || f.type === 'application/pdf'
         );
+        // Mark non-OCR files as done/skipped
+        for (const f of uploadedFiles) {
+          if (!(f.type.startsWith('image/') || f.type === 'application/pdf')) {
+            setFileStatus(f._file, 'skipped', 'No transcription needed');
+          }
+        }
         const ocrResults = await Promise.allSettled(
           ocrTargets.map(f =>
             supabase.functions.invoke('ocr-extract', {
@@ -211,14 +246,21 @@ export function CreateNoteDialog({
             })
           )
         );
-        for (const r of ocrResults) {
+        ocrResults.forEach((r, idx) => {
+          const target = ocrTargets[idx];
           if (r.status === 'fulfilled') {
             const txt = (r.value as { data?: { extractedText?: string } })?.data?.extractedText;
-            if (txt && typeof txt === 'string') ocrAppendText += '\n\n' + txt;
+            if (txt && typeof txt === 'string' && txt.trim()) {
+              ocrAppendText += '\n\n' + txt;
+              setFileStatus(target._file, 'done', 'Transcribed');
+            } else {
+              setFileStatus(target._file, 'done', 'No text found');
+            }
           } else {
             console.error('OCR error:', r.reason);
+            setFileStatus(target._file, 'error', 'Transcription failed');
           }
-        }
+        });
       }
 
       const finalContent = ocrAppendText ? content + ocrAppendText : content;
@@ -389,21 +431,72 @@ export function CreateNoteDialog({
             </div>
             {files.length > 0 && (
               <div className="mt-3 space-y-2">
-                {files.map((file, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-2 bg-muted rounded-lg"
-                  >
-                    <span className="text-sm truncate">{file.name}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeFile(index)}
+                {files.map((file, index) => {
+                  const key = `${file.name}:${file.size}`;
+                  const s = fileStatuses[key]?.status ?? 'pending';
+                  const msg = fileStatuses[key]?.message;
+                  const isOcrTarget =
+                    file.type.startsWith('image/') || file.type === 'application/pdf';
+                  let icon: JSX.Element;
+                  let label: string;
+                  let cls = 'text-muted-foreground';
+                  switch (s) {
+                    case 'uploading':
+                      icon = <Loader2 className="h-3.5 w-3.5 animate-spin" />;
+                      label = 'Uploading…';
+                      cls = 'text-indigo-500';
+                      break;
+                    case 'ocr':
+                      icon = <ScanText className="h-3.5 w-3.5 animate-pulse" />;
+                      label = 'Transcribing…';
+                      cls = 'text-purple-500';
+                      break;
+                    case 'done':
+                      icon = <CheckCircle2 className="h-3.5 w-3.5" />;
+                      label = msg || 'Done';
+                      cls = 'text-emerald-500';
+                      break;
+                    case 'skipped':
+                      icon = <FileText className="h-3.5 w-3.5" />;
+                      label = msg || 'Attached';
+                      cls = 'text-muted-foreground';
+                      break;
+                    case 'error':
+                      icon = <AlertCircle className="h-3.5 w-3.5" />;
+                      label = msg || 'Error';
+                      cls = 'text-destructive';
+                      break;
+                    default:
+                      icon = isOcrTarget ? (
+                        <ScanText className="h-3.5 w-3.5" />
+                      ) : (
+                        <FileText className="h-3.5 w-3.5" />
+                      );
+                      label = isOcrTarget ? 'Ready to transcribe' : 'Ready';
+                  }
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between gap-2 p-2 bg-muted rounded-lg"
                     >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-sm truncate">{file.name}</span>
+                        <span className={`flex items-center gap-1 text-xs whitespace-nowrap ${cls}`}>
+                          {icon}
+                          {label}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={s === 'uploading' || s === 'ocr'}
+                        onClick={() => removeFile(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
