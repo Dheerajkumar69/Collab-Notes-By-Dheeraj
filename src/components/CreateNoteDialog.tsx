@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Upload, X, Loader2, LayoutTemplate, CheckCircle2, AlertCircle, ScanText, FileText, Ban } from 'lucide-react';
+import { Upload, X, Loader2, LayoutTemplate, CheckCircle2, AlertCircle, ScanText, FileText, Ban, ChevronDown, ChevronRight } from 'lucide-react';
 import { useTelegramSync } from '@/hooks/useTelegramSync';
 import { NoteTemplates } from '@/components/NoteTemplates';
 import type { Attachment, Note } from '@/types';
@@ -64,6 +64,9 @@ export function CreateNoteDialog({
   const [processing, setProcessing] = useState(false);
   type FileStatus = 'pending' | 'uploading' | 'ocr' | 'done' | 'skipped' | 'error' | 'cancelled';
   const [fileStatuses, setFileStatuses] = useState<Record<string, { status: FileStatus; message?: string }>>({});
+  // Extracted OCR text per file, for the collapsible preview
+  const [fileOcrText, setFileOcrText] = useState<Record<string, string>>({});
+  const [expandedPreviews, setExpandedPreviews] = useState<Record<string, boolean>>({});
   // AbortControllers keyed by `${name}:${size}` so users can cancel an in-flight OCR call
   const ocrAbortersRef = useRef<Record<string, AbortController>>({});
   const [lectureNumber, setLectureNumber] = useState<number | ''>('');
@@ -94,6 +97,8 @@ export function CreateNoteDialog({
     setColor('white');
     setFiles([]);
     setFileStatuses({});
+    setFileOcrText({});
+    setExpandedPreviews({});
     // Abort any in-flight OCR requests when the form is reset
     Object.values(ocrAbortersRef.current).forEach(c => {
       try { c.abort(); } catch { /* ignore */ }
