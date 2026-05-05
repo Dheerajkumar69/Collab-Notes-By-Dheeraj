@@ -25,6 +25,13 @@ import {
   MAX_NOTE_LABEL_LEN,
   MAX_NOTE_LABELS,
 } from '@/lib/sanitize';
+import {
+  preprocessImage,
+  splitPdfToImages,
+  mapWithConcurrency,
+  withTimeout,
+  LOW_RES_THRESHOLD,
+} from '@/lib/ocrPreprocess';
 
 interface CreateNoteDialogProps {
   open: boolean;
@@ -63,7 +70,9 @@ export function CreateNoteDialog({
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
   type FileStatus = 'pending' | 'uploading' | 'ocr' | 'done' | 'skipped' | 'error' | 'cancelled';
-  const [fileStatuses, setFileStatuses] = useState<Record<string, { status: FileStatus; message?: string }>>({});
+  const [fileStatuses, setFileStatuses] = useState<
+    Record<string, { status: FileStatus; message?: string; pageProgress?: { done: number; total: number } }>
+  >({});
   // Extracted OCR text per file, for the collapsible preview
   const [fileOcrText, setFileOcrText] = useState<Record<string, string>>({});
   const [expandedPreviews, setExpandedPreviews] = useState<Record<string, boolean>>({});
@@ -108,17 +117,36 @@ export function CreateNoteDialog({
     setTopic('');
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const incoming = Array.from(e.target.files);
     const accepted: File[] = [];
-    for (const f of incoming) {
-      const v = validateUploadFile(f);
+    for (const raw of incoming) {
+      const v = validateUploadFile(raw);
       if (!v.ok) {
         toast({ title: 'File rejected', description: v.reason, variant: 'destructive' });
         continue;
       }
-      accepted.push(f);
+      // Phase 1: pre-process images (HEIC -> JPEG, EXIF auto-rotate, downscale,
+      // strip metadata). Non-images and PDFs pass through unchanged.
+      let processed = raw;
+      let lowRes = false;
+      if (raw.type.startsWith('image/') || /\.(heic|heif)$/i.test(raw.name)) {
+        try {
+          const r = await preprocessImage(raw);
+          processed = r.file;
+          lowRes = !!r.lowRes;
+        } catch (err) {
+          console.warn('preprocessImage failed:', err);
+        }
+      }
+      if (lowRes) {
+        toast({
+          title: 'Low-resolution image',
+          description: `${raw.name} is below ${LOW_RES_THRESHOLD}px — text may be hard to read.`,
+        });
+      }
+      accepted.push(processed);
     }
     setFiles(accepted);
     setFileStatuses(
@@ -167,10 +195,15 @@ export function CreateNoteDialog({
     setFileStatus(file, 'cancelled', 'Transcription cancelled');
   };
 
-  const setFileStatus = (file: File, status: FileStatus, message?: string) => {
+  const setFileStatus = (
+    file: File,
+    status: FileStatus,
+    message?: string,
+    pageProgress?: { done: number; total: number },
+  ) => {
     setFileStatuses(prev => ({
       ...prev,
-      [`${file.name}:${file.size}`]: { status, message },
+      [`${file.name}:${file.size}`]: { status, message, pageProgress },
     }));
   };
 
