@@ -688,6 +688,7 @@ export function CreateNoteDialog({
                   const key = `${file.name}:${file.size}`;
                   const s = fileStatuses[key]?.status ?? 'pending';
                   const msg = fileStatuses[key]?.message;
+                  const pp = fileStatuses[key]?.pageProgress;
                   const isOcrTarget =
                     file.type.startsWith('image/') || file.type === 'application/pdf';
                   let icon: JSX.Element;
@@ -701,7 +702,7 @@ export function CreateNoteDialog({
                       break;
                     case 'ocr':
                       icon = <ScanText className="h-3.5 w-3.5 animate-pulse" />;
-                      label = 'Transcribing…';
+                      label = pp ? `Transcribing… ${pp.done}/${pp.total}` : msg || 'Transcribing…';
                       cls = 'text-purple-500';
                       break;
                     case 'done':
