@@ -411,7 +411,7 @@ export function CreateNoteDialog({
               if (target.type === 'application/pdf') {
                 // Split PDF -> per-page JPEGs.
                 setFileStatus(target._file, 'ocr', 'Splitting PDF…');
-                let pages;
+                let pages: Awaited<ReturnType<typeof splitPdfToImages>> = [];
                 try {
                   pages = await splitPdfToImages(target._file);
                 } catch (err) {
