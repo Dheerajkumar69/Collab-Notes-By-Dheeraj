@@ -26,9 +26,14 @@ function isHeic(file: File): boolean {
 /** Convert HEIC/HEIF -> JPEG using heic2any (browser only). */
 async function heicToJpeg(file: File): Promise<File> {
   // Dynamic import keeps heic2any out of the main bundle for non-iPhone users.
-  const mod = await import('heic2any');
-  const heic2any = (mod as { default: typeof import('heic2any') }).default;
-  const blob = (await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 })) as Blob;
+  // heic2any's published types export the function as the module namespace itself,
+  // but the runtime ships a CJS default export — handle both shapes.
+  const mod: unknown = await import('heic2any');
+  type Heic2AnyFn = (opts: { blob: Blob; toType?: string; quality?: number }) => Promise<Blob | Blob[]>;
+  const heic2any =
+    (mod as { default?: Heic2AnyFn }).default ?? (mod as Heic2AnyFn);
+  const result = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+  const blob = Array.isArray(result) ? result[0] : result;
   const newName = file.name.replace(/\.(heic|heif)$/i, '.jpg');
   return new File([blob], newName, { type: 'image/jpeg', lastModified: Date.now() });
 }
