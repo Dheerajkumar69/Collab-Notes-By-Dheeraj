@@ -25,6 +25,13 @@ import {
   MAX_NOTE_LABEL_LEN,
   MAX_NOTE_LABELS,
 } from '@/lib/sanitize';
+import {
+  preprocessImage,
+  splitPdfToImages,
+  mapWithConcurrency,
+  withTimeout,
+  LOW_RES_THRESHOLD,
+} from '@/lib/ocrPreprocess';
 
 interface CreateNoteDialogProps {
   open: boolean;
@@ -63,7 +70,9 @@ export function CreateNoteDialog({
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
   type FileStatus = 'pending' | 'uploading' | 'ocr' | 'done' | 'skipped' | 'error' | 'cancelled';
-  const [fileStatuses, setFileStatuses] = useState<Record<string, { status: FileStatus; message?: string }>>({});
+  const [fileStatuses, setFileStatuses] = useState<
+    Record<string, { status: FileStatus; message?: string; pageProgress?: { done: number; total: number } }>
+  >({});
   // Extracted OCR text per file, for the collapsible preview
   const [fileOcrText, setFileOcrText] = useState<Record<string, string>>({});
   const [expandedPreviews, setExpandedPreviews] = useState<Record<string, boolean>>({});
@@ -108,17 +117,36 @@ export function CreateNoteDialog({
     setTopic('');
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const incoming = Array.from(e.target.files);
     const accepted: File[] = [];
-    for (const f of incoming) {
-      const v = validateUploadFile(f);
+    for (const raw of incoming) {
+      const v = validateUploadFile(raw);
       if (!v.ok) {
         toast({ title: 'File rejected', description: v.reason, variant: 'destructive' });
         continue;
       }
-      accepted.push(f);
+      // Phase 1: pre-process images (HEIC -> JPEG, EXIF auto-rotate, downscale,
+      // strip metadata). Non-images and PDFs pass through unchanged.
+      let processed = raw;
+      let lowRes = false;
+      if (raw.type.startsWith('image/') || /\.(heic|heif)$/i.test(raw.name)) {
+        try {
+          const r = await preprocessImage(raw);
+          processed = r.file;
+          lowRes = !!r.lowRes;
+        } catch (err) {
+          console.warn('preprocessImage failed:', err);
+        }
+      }
+      if (lowRes) {
+        toast({
+          title: 'Low-resolution image',
+          description: `${raw.name} is below ${LOW_RES_THRESHOLD}px — text may be hard to read.`,
+        });
+      }
+      accepted.push(processed);
     }
     setFiles(accepted);
     setFileStatuses(
@@ -167,10 +195,15 @@ export function CreateNoteDialog({
     setFileStatus(file, 'cancelled', 'Transcription cancelled');
   };
 
-  const setFileStatus = (file: File, status: FileStatus, message?: string) => {
+  const setFileStatus = (
+    file: File,
+    status: FileStatus,
+    message?: string,
+    pageProgress?: { done: number; total: number },
+  ) => {
     setFileStatuses(prev => ({
       ...prev,
-      [`${file.name}:${file.size}`]: { status, message },
+      [`${file.name}:${file.size}`]: { status, message, pageProgress },
     }));
   };
 
@@ -266,69 +299,221 @@ export function CreateNoteDialog({
         const uploadedFiles = await Promise.all(uploadPromises);
         attachments = [...attachments, ...uploadedFiles.map(({ _file, ...rest }) => rest)];
 
-        // OCR for images and PDFs using edge function — parallel + accumulate locally.
-        // (state setters are async, so we cannot rely on `content` being updated
-        // before we build noteData below — we must use a local string.)
+        // OCR for images and PDFs using edge function.
+        // - Images: one OCR call per file.
+        // - PDFs: split client-side into per-page JPEGs, upload each page,
+        //   then OCR pages with bounded concurrency and stitch results.
         setProcessing(true);
         const ocrTargets = uploadedFiles.filter(
-          f => f.type.startsWith('image/') || f.type === 'application/pdf'
+          f => f.type.startsWith('image/') || f.type === 'application/pdf',
         );
-        // Mark non-OCR files as done/skipped
         for (const f of uploadedFiles) {
           if (!(f.type.startsWith('image/') || f.type === 'application/pdf')) {
             setFileStatus(f._file, 'skipped', 'No transcription needed');
           }
         }
-        const ocrResults = await Promise.allSettled(
-          ocrTargets.map(f => {
-            const key = `${f._file.name}:${f._file.size}`;
-            const controller = new AbortController();
-            ocrAbortersRef.current[key] = controller;
-            return supabase.functions
-              .invoke('ocr-extract', {
-                body: { storagePath: f.path },
-              } as Parameters<typeof supabase.functions.invoke>[1] & { signal?: AbortSignal })
-              .then(
-                v => {
-                  if (controller.signal.aborted) {
-                    throw new DOMException('Aborted', 'AbortError');
-                  }
-                  return v;
-                },
-                e => { throw e; },
-              )
-              .finally(() => {
-                if (ocrAbortersRef.current[key] === controller) {
-                  delete ocrAbortersRef.current[key];
-                }
-              });
-          })
-        );
-        ocrResults.forEach((r, idx) => {
-          const target = ocrTargets[idx];
-          const key = `${target._file.name}:${target._file.size}`;
-          // If the user cancelled this file, leave its 'cancelled' status alone
-          if (fileStatuses[key]?.status === 'cancelled') return;
-          if (r.status === 'fulfilled') {
-            const txt = (r.value as { data?: { extractedText?: string } })?.data?.extractedText;
-            if (txt && typeof txt === 'string' && txt.trim()) {
-              ocrAppendText += '\n\n' + txt;
-              setFileStatus(target._file, 'done', 'Transcribed');
-              setFileOcrText(prev => ({ ...prev, [key]: txt }));
-              setExpandedPreviews(prev => ({ ...prev, [key]: false }));
-            } else {
-              setFileStatus(target._file, 'done', 'No text found');
-            }
+
+        // Track surfaced error toasts so we don't spam (one toast per error class).
+        const surfacedErrors = new Set<string>();
+        const surfaceErrorToast = (kind: 'credits' | 'rate' | 'timeout' | 'generic', detail?: string) => {
+          if (surfacedErrors.has(kind)) return;
+          surfacedErrors.add(kind);
+          if (kind === 'credits') {
+            toast({
+              title: 'AI credits exhausted',
+              description: 'Files are saved as attachments — transcription is paused. Add credits in workspace settings.',
+              variant: 'destructive',
+            });
+          } else if (kind === 'rate') {
+            toast({
+              title: 'Too many requests',
+              description: 'Rate limit hit. Try again in a minute or split into smaller batches.',
+              variant: 'destructive',
+            });
+          } else if (kind === 'timeout') {
+            toast({
+              title: 'Transcription timed out',
+              description: 'A file took too long. The original is still attached — you can retry later.',
+              variant: 'destructive',
+            });
           } else {
-            const reason = (r.reason as { name?: string; message?: string }) || {};
-            if (reason.name === 'AbortError') {
-              setFileStatus(target._file, 'cancelled', 'Transcription cancelled');
-              return;
-            }
-            console.error('OCR error:', r.reason);
-            setFileStatus(target._file, 'error', 'Transcription failed');
+            toast({
+              title: 'Transcription failed',
+              description: detail || 'One or more files could not be transcribed.',
+              variant: 'destructive',
+            });
           }
-        });
+        };
+
+        // Classify a Supabase functions error or thrown value.
+        const classifyError = (err: unknown): 'credits' | 'rate' | 'timeout' | 'generic' => {
+          const e = err as { name?: string; status?: number; message?: string; context?: { status?: number } };
+          if (e?.name === 'TimeoutError') return 'timeout';
+          const status = e?.status ?? e?.context?.status;
+          if (status === 402) return 'credits';
+          if (status === 429) return 'rate';
+          const msg = (e?.message || '').toLowerCase();
+          if (msg.includes('credit')) return 'credits';
+          if (msg.includes('rate') || msg.includes('429')) return 'rate';
+          if (msg.includes('timeout') || msg.includes('timed out')) return 'timeout';
+          return 'generic';
+        };
+
+        // Helper: upload one Blob/File to storage, return { path, signedUrl }.
+        const uploadAux = async (blob: File, suffix: string) => {
+          const ext = (blob.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'jpg';
+          const path = `${groupId}/${crypto.randomUUID()}-${suffix}.${ext}`;
+          const { error: upErr } = await supabase.storage.from('note-attachments').upload(path, blob);
+          if (upErr) throw upErr;
+          newlyUploadedPaths.push(path);
+          return path;
+        };
+
+        // OCR a single storage path with a 60s timeout + abort support.
+        // Returns extracted text or throws (classifiable) errors.
+        const ocrOnePath = async (storagePath: string, abortKey: string): Promise<string> => {
+          const controller = new AbortController();
+          ocrAbortersRef.current[abortKey] = controller;
+          try {
+            const t0 = performance.now();
+            const invocation = supabase.functions
+              .invoke('ocr-extract', {
+                body: { storagePath },
+              } as Parameters<typeof supabase.functions.invoke>[1] & { signal?: AbortSignal })
+              .then(v => {
+                if (controller.signal.aborted) {
+                  throw new DOMException('Aborted', 'AbortError');
+                }
+                return v;
+              });
+            const result = await withTimeout(invocation, 60_000, controller);
+            const latency = Math.round(performance.now() - t0);
+            const r = result as { data?: { extractedText?: string; model?: string }; error?: unknown };
+            if (r.error) throw r.error;
+            const txt = r.data?.extractedText || '';
+            console.info(
+              `[OCR] ${storagePath} model=${r.data?.model || 'unknown'} chars=${txt.length} latency=${latency}ms`,
+            );
+            return txt;
+          } finally {
+            if (ocrAbortersRef.current[abortKey] === controller) {
+              delete ocrAbortersRef.current[abortKey];
+            }
+          }
+        };
+
+        // Process each OCR target. Run targets in parallel; PDFs internally
+        // run their pages with concurrency=3.
+        await Promise.all(
+          ocrTargets.map(async target => {
+            const key = `${target._file.name}:${target._file.size}`;
+            try {
+              if (target.type === 'application/pdf') {
+                // Split PDF -> per-page JPEGs.
+                setFileStatus(target._file, 'ocr', 'Splitting PDF…');
+                let pages: Awaited<ReturnType<typeof splitPdfToImages>> = [];
+                try {
+                  pages = await splitPdfToImages(target._file);
+                } catch (err) {
+                  console.warn('PDF split failed, falling back to single-call OCR:', err);
+                  // Fallback: OCR the whole PDF as before.
+                  setFileStatus(target._file, 'ocr', 'Transcribing…');
+                  const txt = await ocrOnePath(target.path, key);
+                  if (txt.trim()) {
+                    ocrAppendText += '\n\n' + txt;
+                    setFileStatus(target._file, 'done', 'Transcribed');
+                    setFileOcrText(prev => ({ ...prev, [key]: txt }));
+                    setExpandedPreviews(prev => ({ ...prev, [key]: false }));
+                  } else {
+                    setFileStatus(target._file, 'done', 'No text found');
+                  }
+                  return;
+                }
+
+                if (pages.length === 0) {
+                  setFileStatus(target._file, 'done', 'Empty PDF');
+                  return;
+                }
+
+                let done = 0;
+                setFileStatus(target._file, 'ocr', `Page 0 of ${pages.length}`, { done: 0, total: pages.length });
+
+                const pageResults = await mapWithConcurrency(pages, 3, async page => {
+                  const path = await uploadAux(page.file, `pdf-p${page.pageNumber}`);
+                  const pageKey = `${key}#p${page.pageNumber}`;
+                  const txt = await ocrOnePath(path, pageKey);
+                  done += 1;
+                  setFileStatus(
+                    target._file,
+                    'ocr',
+                    `Page ${done} of ${pages.length}`,
+                    { done, total: pages.length },
+                  );
+                  return txt;
+                });
+
+                // Stitch results in order, with page separators.
+                const parts: string[] = [];
+                let firstError: unknown = null;
+                pageResults.forEach((r, i) => {
+                  if (r.status === 'fulfilled') {
+                    const t = (r.value || '').trim();
+                    if (t) parts.push(`--- Page ${pages[i].pageNumber} ---\n${t}`);
+                  } else if (!firstError) {
+                    firstError = r.reason;
+                  }
+                });
+                if (firstError && parts.length === 0) throw firstError;
+
+                const combined = parts.join('\n\n');
+                if (combined) {
+                  ocrAppendText += '\n\n' + combined;
+                  setFileStatus(
+                    target._file,
+                    'done',
+                    firstError ? `Transcribed (some pages failed)` : 'Transcribed',
+                  );
+                  setFileOcrText(prev => ({ ...prev, [key]: combined }));
+                  setExpandedPreviews(prev => ({ ...prev, [key]: false }));
+                } else {
+                  setFileStatus(target._file, 'done', 'No text found');
+                }
+              } else {
+                // Single image
+                setFileStatus(target._file, 'ocr', 'Transcribing…');
+                const txt = await ocrOnePath(target.path, key);
+                if (txt.trim()) {
+                  ocrAppendText += '\n\n' + txt;
+                  setFileStatus(target._file, 'done', 'Transcribed');
+                  setFileOcrText(prev => ({ ...prev, [key]: txt }));
+                  setExpandedPreviews(prev => ({ ...prev, [key]: false }));
+                } else {
+                  setFileStatus(target._file, 'done', 'No text found');
+                }
+              }
+            } catch (err) {
+              const reason = err as { name?: string };
+              if (reason?.name === 'AbortError') {
+                setFileStatus(target._file, 'cancelled', 'Transcription cancelled');
+                return;
+              }
+              const kind = classifyError(err);
+              console.error('OCR error:', err);
+              setFileStatus(
+                target._file,
+                'error',
+                kind === 'credits'
+                  ? 'Out of AI credits'
+                  : kind === 'rate'
+                  ? 'Rate-limited'
+                  : kind === 'timeout'
+                  ? 'Timed out'
+                  : 'Transcription failed',
+              );
+              surfaceErrorToast(kind);
+            }
+          }),
+        );
       }
 
       const finalContent = ocrAppendText ? content + ocrAppendText : content;
@@ -503,6 +688,7 @@ export function CreateNoteDialog({
                   const key = `${file.name}:${file.size}`;
                   const s = fileStatuses[key]?.status ?? 'pending';
                   const msg = fileStatuses[key]?.message;
+                  const pp = fileStatuses[key]?.pageProgress;
                   const isOcrTarget =
                     file.type.startsWith('image/') || file.type === 'application/pdf';
                   let icon: JSX.Element;
@@ -516,7 +702,7 @@ export function CreateNoteDialog({
                       break;
                     case 'ocr':
                       icon = <ScanText className="h-3.5 w-3.5 animate-pulse" />;
-                      label = 'Transcribing…';
+                      label = pp ? `Transcribing… ${pp.done}/${pp.total}` : msg || 'Transcribing…';
                       cls = 'text-purple-500';
                       break;
                     case 'done':
