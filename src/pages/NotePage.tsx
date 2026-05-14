@@ -789,6 +789,12 @@ export default function NotePage() {
 
           {/* Content Area */}
           <div className="min-h-[200px]">
+            {otherEditor && !isEditingContent && (
+              <div className="mb-3 flex items-center gap-2 p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-sm">
+                <LockIcon className="h-4 w-4 text-amber-500" />
+                <span><strong>{otherEditor.name}</strong> is editing — your save may conflict.</span>
+              </div>
+            )}
             {isEditingContent && canEdit ? (
               <div className="space-y-3">
                 <RichTextEditor
