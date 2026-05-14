@@ -148,12 +148,11 @@ export function CreateNoteDialog({
       }
       accepted.push(processed);
     }
-    setFiles(accepted);
-    setFileStatuses(
-      Object.fromEntries(accepted.map(f => [`${f.name}:${f.size}`, { status: 'pending' as FileStatus }]))
-    );
-    setFileOcrText({});
-    setExpandedPreviews({});
+    setFiles(prev => [...prev, ...accepted]);
+    setFileStatuses(prev => ({
+      ...prev,
+      ...Object.fromEntries(accepted.map(f => [`${f.name}:${f.size}`, { status: 'pending' as FileStatus }])),
+    }));
     e.target.value = '';
   };
 
