@@ -53,6 +53,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useDeleteNoteWithCleanup } from '@/hooks/useDeleteNoteWithCleanup';
+import { useNotePresence } from '@/hooks/useNotePresence';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Lock as LockIcon, AlertTriangle } from 'lucide-react';
 
 interface Attachment {
   url: string;
@@ -75,6 +78,7 @@ interface Note {
   updated_at?: string | null;
   lecture_number?: number | null;
   topic?: string | null;
+  version?: number;
 }
 
 interface Group {
@@ -119,17 +123,51 @@ export default function NotePage() {
   
   const canEdit = note?.created_by === user?.id;
 
+  const { others, otherEditor, setEditing } = useNotePresence(
+    noteId,
+    author?.full_name || (user?.email?.split('@')[0] ?? 'User'),
+    author?.avatar_url || null,
+  );
+
+  // Broadcast editing flag whenever user enters/leaves edit mode
+  useEffect(() => {
+    setEditing(isEditingContent);
+    return () => { setEditing(false); };
+  }, [isEditingContent, setEditing]);
+
   const handleSaveContent = useCallback(async () => {
     if (!note) return;
     setSaving(true);
     try {
-      const { error } = await supabase
+      const expectedVersion = note.version ?? 1;
+      const { data, error } = await supabase
         .from('notes')
-        .update({ content: editContent, updated_at: new Date().toISOString() })
-        .eq('id', note.id);
+        .update({
+          content: editContent,
+          updated_at: new Date().toISOString(),
+          version: expectedVersion + 1,
+        })
+        .eq('id', note.id)
+        .eq('version', expectedVersion)
+        .select('id, version')
+        .maybeSingle();
 
       if (error) throw error;
-      setNote(prev => prev ? { ...prev, content: editContent } : null);
+      if (!data) {
+        // Version mismatch — someone else saved first.
+        toast({
+          title: 'Save conflict',
+          description: 'Someone else updated this note. Reloading their version — copy your changes first.',
+          variant: 'destructive',
+        });
+        // Reload latest from server
+        const { data: fresh } = await supabase.from('notes').select('*').eq('id', note.id).single();
+        if (fresh) {
+          setNote(prev => prev ? { ...prev, content: fresh.content, version: fresh.version } : null);
+        }
+        return;
+      }
+      setNote(prev => prev ? { ...prev, content: editContent, version: data.version } : null);
       setIsEditingContent(false);
       setHasUnsavedChanges(false);
       toast({ title: 'Saved', description: 'Content updated' });
