@@ -55,7 +55,7 @@ import {
 import { useDeleteNoteWithCleanup } from '@/hooks/useDeleteNoteWithCleanup';
 import { useNotePresence } from '@/hooks/useNotePresence';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Lock as LockIcon, AlertTriangle } from 'lucide-react';
+import { Lock as LockIcon } from 'lucide-react';
 
 interface Attachment {
   url: string;
