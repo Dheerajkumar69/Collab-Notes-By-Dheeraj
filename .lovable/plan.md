@@ -24,5 +24,8 @@ Enable realtime on user_presence. Add RLS policies for all tables.
 7. **Reminders** — Due date picker on notes, notification when due
 8. **Export** — PDF & Markdown export buttons on NotePage
 
-## Not implementing: Real-time co-editing (Yjs)
-Yjs requires a persistent WebSocket server for conflict resolution, which isn't available in this environment. This would need a dedicated collaboration server (e.g., Hocuspocus). I'll note this as a future enhancement.
+## Shipped (gap-fill pass)
+- PDF export (single + bulk) via lazy-loaded jspdf+html2canvas.
+- Mobile camera capture for OCR (input capture="environment").
+- Reminders fire via process-reminders edge function on pg_cron every 5 min, with snooze + recurrence.
+- Soft co-editing (Path A): Realtime presence avatars + editing broadcast + version-based conflict detection on save (no Yjs/Hocuspocus).
