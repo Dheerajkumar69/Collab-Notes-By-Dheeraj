@@ -425,6 +425,31 @@ export default function NotePage() {
 
             {/* Actions */}
             <div className="flex items-center gap-2">
+              {others.length > 0 && (
+                <TooltipProvider>
+                  <div className="flex -space-x-2 mr-1">
+                    {others.slice(0, 3).map(v => (
+                      <Tooltip key={v.user_id}>
+                        <TooltipTrigger asChild>
+                          <Avatar className="h-6 w-6 border-2 border-background">
+                            {v.avatar_url && <AvatarImage src={v.avatar_url} />}
+                            <AvatarFallback className="text-[10px] bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
+                              {v.name?.charAt(0)?.toUpperCase() || '?'}
+                            </AvatarFallback>
+                          </Avatar>
+                        </TooltipTrigger>
+                        <TooltipContent>{v.name}{v.editing ? ' (editing)' : ' is viewing'}</TooltipContent>
+                      </Tooltip>
+                    ))}
+                    {others.length > 3 && (
+                      <div className="h-6 w-6 rounded-full bg-muted border-2 border-background text-[10px] flex items-center justify-center">
+                        +{others.length - 3}
+                      </div>
+                    )}
+                  </div>
+                </TooltipProvider>
+              )}
+
               {/* Unsaved changes indicator */}
               {hasUnsavedChanges && (
                 <span className="text-xs text-amber-500 font-medium hidden sm:block">
