@@ -432,6 +432,7 @@ export type Database = {
           title: string
           topic: string | null
           updated_at: string | null
+          version: number
         }
         Insert: {
           attachments?: Json | null
@@ -455,6 +456,7 @@ export type Database = {
           title: string
           topic?: string | null
           updated_at?: string | null
+          version?: number
         }
         Update: {
           attachments?: Json | null
@@ -478,6 +480,7 @@ export type Database = {
           title?: string
           topic?: string | null
           updated_at?: string | null
+          version?: number
         }
         Relationships: [
           {
@@ -588,6 +591,7 @@ export type Database = {
           id: string
           is_online: boolean
           last_seen: string
+          note_id: string | null
           user_id: string
         }
         Insert: {
@@ -595,6 +599,7 @@ export type Database = {
           id?: string
           is_online?: boolean
           last_seen?: string
+          note_id?: string | null
           user_id: string
         }
         Update: {
@@ -602,6 +607,7 @@ export type Database = {
           id?: string
           is_online?: boolean
           last_seen?: string
+          note_id?: string | null
           user_id?: string
         }
         Relationships: [
