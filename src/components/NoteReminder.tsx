@@ -6,7 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Bell, BellRing, Check, X } from 'lucide-react';
+import { Bell, BellRing, Check, X, Clock, Repeat } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
 import { format, isPast, isFuture } from 'date-fns';
 
@@ -20,6 +28,7 @@ interface Reminder {
   id: string;
   due_date: string;
   is_completed: boolean;
+  recurrence?: 'none' | 'daily' | 'weekly' | 'monthly';
 }
 
 export function NoteReminder({ noteId, groupId, noteTitle }: NoteReminderProps) {
@@ -36,11 +45,11 @@ export function NoteReminder({ noteId, groupId, noteTitle }: NoteReminderProps) 
     if (!user) return;
     const { data } = await supabase
       .from('note_reminders')
-      .select('id, due_date, is_completed')
+      .select('id, due_date, is_completed, recurrence')
       .eq('note_id', noteId)
       .eq('user_id', user.id)
       .maybeSingle();
-    setReminder(data);
+    setReminder(data as Reminder | null);
     if (data) setSelectedDate(new Date(data.due_date));
   };
 
@@ -49,7 +58,7 @@ export function NoteReminder({ noteId, groupId, noteTitle }: NoteReminderProps) 
     try {
       if (reminder) {
         await supabase.from('note_reminders')
-          .update({ due_date: date.toISOString(), is_completed: false })
+          .update({ due_date: date.toISOString(), is_completed: false, reminded: false })
           .eq('id', reminder.id);
       } else {
         await supabase.from('note_reminders').insert({
@@ -67,6 +76,23 @@ export function NoteReminder({ noteId, groupId, noteTitle }: NoteReminderProps) 
     } catch (e) {
       toast({ title: 'Error', description: 'Failed to set reminder', variant: 'destructive' });
     }
+  };
+
+  const snooze = async (ms: number) => {
+    if (!reminder) return;
+    const next = new Date(Date.now() + ms);
+    await supabase.from('note_reminders')
+      .update({ due_date: next.toISOString(), reminded: false, is_completed: false })
+      .eq('id', reminder.id);
+    await fetchReminder();
+    toast({ title: 'Snoozed', description: `New due ${format(next, 'MMM d, h:mm a')}` });
+  };
+
+  const setRecurrence = async (recurrence: 'none' | 'daily' | 'weekly' | 'monthly') => {
+    if (!reminder) return;
+    await supabase.from('note_reminders').update({ recurrence }).eq('id', reminder.id);
+    await fetchReminder();
+    toast({ title: 'Updated', description: recurrence === 'none' ? 'No repeat' : `Repeats ${recurrence}` });
   };
 
   const completeReminder = async () => {
@@ -96,7 +122,29 @@ export function NoteReminder({ noteId, groupId, noteTitle }: NoteReminderProps) 
             <BellRing className="h-3 w-3" />
             {isOverdue ? 'Overdue: ' : 'Due: '}
             {format(new Date(reminder.due_date), 'MMM d')}
+            {reminder.recurrence && reminder.recurrence !== 'none' && (
+              <Repeat className="h-3 w-3 ml-1" />
+            )}
           </Badge>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6" title="Snooze / repeat">
+                <Clock className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Snooze</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => snooze(60 * 60 * 1000)}>1 hour</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => snooze(24 * 60 * 60 * 1000)}>1 day</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => snooze(7 * 24 * 60 * 60 * 1000)}>1 week</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Repeat</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => setRecurrence('none')}>None</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setRecurrence('daily')}>Daily</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setRecurrence('weekly')}>Weekly</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setRecurrence('monthly')}>Monthly</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={completeReminder}>
             <Check className="h-3 w-3" />
           </Button>

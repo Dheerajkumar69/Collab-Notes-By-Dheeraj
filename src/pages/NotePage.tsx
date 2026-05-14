@@ -53,6 +53,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useDeleteNoteWithCleanup } from '@/hooks/useDeleteNoteWithCleanup';
+import { useNotePresence } from '@/hooks/useNotePresence';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Lock as LockIcon } from 'lucide-react';
 
 interface Attachment {
   url: string;
@@ -75,6 +78,7 @@ interface Note {
   updated_at?: string | null;
   lecture_number?: number | null;
   topic?: string | null;
+  version?: number;
 }
 
 interface Group {
@@ -119,17 +123,51 @@ export default function NotePage() {
   
   const canEdit = note?.created_by === user?.id;
 
+  const { others, otherEditor, setEditing } = useNotePresence(
+    noteId,
+    author?.full_name || (user?.email?.split('@')[0] ?? 'User'),
+    author?.avatar_url || null,
+  );
+
+  // Broadcast editing flag whenever user enters/leaves edit mode
+  useEffect(() => {
+    setEditing(isEditingContent);
+    return () => { setEditing(false); };
+  }, [isEditingContent, setEditing]);
+
   const handleSaveContent = useCallback(async () => {
     if (!note) return;
     setSaving(true);
     try {
-      const { error } = await supabase
+      const expectedVersion = note.version ?? 1;
+      const { data, error } = await supabase
         .from('notes')
-        .update({ content: editContent, updated_at: new Date().toISOString() })
-        .eq('id', note.id);
+        .update({
+          content: editContent,
+          updated_at: new Date().toISOString(),
+          version: expectedVersion + 1,
+        })
+        .eq('id', note.id)
+        .eq('version', expectedVersion)
+        .select('id, version')
+        .maybeSingle();
 
       if (error) throw error;
-      setNote(prev => prev ? { ...prev, content: editContent } : null);
+      if (!data) {
+        // Version mismatch — someone else saved first.
+        toast({
+          title: 'Save conflict',
+          description: 'Someone else updated this note. Reloading their version — copy your changes first.',
+          variant: 'destructive',
+        });
+        // Reload latest from server
+        const { data: fresh } = await supabase.from('notes').select('*').eq('id', note.id).single();
+        if (fresh) {
+          setNote(prev => prev ? { ...prev, content: fresh.content, version: fresh.version } : null);
+        }
+        return;
+      }
+      setNote(prev => prev ? { ...prev, content: editContent, version: data.version } : null);
       setIsEditingContent(false);
       setHasUnsavedChanges(false);
       toast({ title: 'Saved', description: 'Content updated' });
@@ -387,6 +425,31 @@ export default function NotePage() {
 
             {/* Actions */}
             <div className="flex items-center gap-2">
+              {others.length > 0 && (
+                <TooltipProvider>
+                  <div className="flex -space-x-2 mr-1">
+                    {others.slice(0, 3).map(v => (
+                      <Tooltip key={v.user_id}>
+                        <TooltipTrigger asChild>
+                          <Avatar className="h-6 w-6 border-2 border-background">
+                            {v.avatar_url && <AvatarImage src={v.avatar_url} />}
+                            <AvatarFallback className="text-[10px] bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
+                              {v.name?.charAt(0)?.toUpperCase() || '?'}
+                            </AvatarFallback>
+                          </Avatar>
+                        </TooltipTrigger>
+                        <TooltipContent>{v.name}{v.editing ? ' (editing)' : ' is viewing'}</TooltipContent>
+                      </Tooltip>
+                    ))}
+                    {others.length > 3 && (
+                      <div className="h-6 w-6 rounded-full bg-muted border-2 border-background text-[10px] flex items-center justify-center">
+                        +{others.length - 3}
+                      </div>
+                    )}
+                  </div>
+                </TooltipProvider>
+              )}
+
               {/* Unsaved changes indicator */}
               {hasUnsavedChanges && (
                 <span className="text-xs text-amber-500 font-medium hidden sm:block">
@@ -635,7 +698,13 @@ export default function NotePage() {
           <div className="flex flex-wrap items-center gap-2 mb-6">
             <NoteReminder noteId={note.id} groupId={group.id} noteTitle={note.title} />
             <AISummarize noteTitle={note.title} noteContent={note.content || ''} />
-            <NoteExport title={note.title} content={note.content || ''} />
+            <NoteExport
+              title={note.title}
+              content={note.content || ''}
+              authorName={author?.full_name || note.author_name}
+              groupName={group.name}
+              createdAt={note.created_at}
+            />
           </div>
 
           <Separator className="my-6" />
@@ -720,6 +789,12 @@ export default function NotePage() {
 
           {/* Content Area */}
           <div className="min-h-[200px]">
+            {otherEditor && !isEditingContent && (
+              <div className="mb-3 flex items-center gap-2 p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-sm">
+                <LockIcon className="h-4 w-4 text-amber-500" />
+                <span><strong>{otherEditor.name}</strong> is editing — your save may conflict.</span>
+              </div>
+            )}
             {isEditingContent && canEdit ? (
               <div className="space-y-3">
                 <RichTextEditor

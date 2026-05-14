@@ -2,3 +2,6 @@ project_id = "ihtiwobehmhfzbraihfs"
 
 [functions.telegram-sync]
 verify_jwt = false
+
+[functions.process-reminders]
+verify_jwt = false

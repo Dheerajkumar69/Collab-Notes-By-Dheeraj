@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, FileJson, FileText, Loader2, Check } from 'lucide-react';
+import { Download, FileJson, FileText, FileType, Loader2, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   Dialog,
@@ -21,7 +21,7 @@ import type { Tables } from '@/integrations/supabase/types';
 type Note = Tables<'notes'>;
 type Group = Tables<'groups'>;
 
-type ExportFormat = 'markdown' | 'json';
+type ExportFormat = 'markdown' | 'json' | 'pdf';
 
 export function ExportNotesDialog() {
   const [open, setOpen] = useState(false);
@@ -63,6 +63,36 @@ export function ExportNotesDialog() {
           title: 'No notes to export',
           description: 'Create some notes first.',
         });
+        return;
+      }
+
+      if (format === 'pdf') {
+        if (notes.length > 100) {
+          toast({
+            title: 'Too many notes',
+            description: `PDF export is capped at 100 notes (you have ${notes.length}). Filter or archive some first.`,
+            variant: 'destructive',
+          });
+          return;
+        }
+        const { exportNotesBundleToPdf } = await import('@/lib/pdfExport');
+        await exportNotesBundleToPdf(
+          (notes as Note[]).map(n => ({
+            title: n.title,
+            content: n.content,
+            author_name: n.author_name,
+            group_name: (groups as Group[]).find(g => g.id === n.group_id)?.name,
+            created_at: n.created_at,
+          })),
+          {
+            coverTitle: 'CollabNotes Export',
+            onProgress: msg =>
+              toast({ title: 'Generating PDF…', description: msg }),
+          },
+        );
+        setExported(true);
+        toast({ title: '✅ Export complete!', description: `Exported ${notes.length} notes as PDF.` });
+        setTimeout(() => { setExported(false); setOpen(false); }, 1500);
         return;
       }
 
@@ -147,6 +177,20 @@ export function ExportNotesDialog() {
           <div className="space-y-3">
             <Label>Export Format</Label>
             <RadioGroup value={format} onValueChange={(v) => setFormat(v as ExportFormat)}>
+              <motion.div
+                whileHover={{ scale: 1.01 }}
+                className={`flex items-center space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                  format === 'pdf' ? 'border-primary bg-primary/5' : 'border-border'
+                }`}
+                onClick={() => setFormat('pdf')}
+              >
+                <RadioGroupItem value="pdf" id="pdf" />
+                <FileType className={`h-5 w-5 ${format === 'pdf' ? 'text-primary' : 'text-muted-foreground'}`} />
+                <div className="flex-1">
+                  <Label htmlFor="pdf" className="cursor-pointer font-medium">PDF</Label>
+                  <p className="text-xs text-muted-foreground">Single document with cover page, ideal for sharing</p>
+                </div>
+              </motion.div>
               <motion.div
                 whileHover={{ scale: 1.01 }}
                 className={`flex items-center space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${

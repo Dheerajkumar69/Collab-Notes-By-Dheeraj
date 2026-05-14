@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Upload, X, Loader2, LayoutTemplate, CheckCircle2, AlertCircle, ScanText, FileText, Ban, ChevronDown, ChevronRight } from 'lucide-react';
+import { Upload, X, Loader2, LayoutTemplate, CheckCircle2, AlertCircle, ScanText, FileText, Ban, ChevronDown, ChevronRight, Camera } from 'lucide-react';
 import { useTelegramSync } from '@/hooks/useTelegramSync';
 import { NoteTemplates } from '@/components/NoteTemplates';
 import type { Attachment, Note } from '@/types';
@@ -148,12 +148,11 @@ export function CreateNoteDialog({
       }
       accepted.push(processed);
     }
-    setFiles(accepted);
-    setFileStatuses(
-      Object.fromEntries(accepted.map(f => [`${f.name}:${f.size}`, { status: 'pending' as FileStatus }]))
-    );
-    setFileOcrText({});
-    setExpandedPreviews({});
+    setFiles(prev => [...prev, ...accepted]);
+    setFileStatuses(prev => ({
+      ...prev,
+      ...Object.fromEntries(accepted.map(f => [`${f.name}:${f.size}`, { status: 'pending' as FileStatus }])),
+    }));
     e.target.value = '';
   };
 
@@ -667,7 +666,7 @@ export function CreateNoteDialog({
 
           <div>
             <Label>Attachments</Label>
-            <div className="mt-2">
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
               <label className="flex items-center gap-2 cursor-pointer border-2 border-dashed rounded-lg p-4 hover:border-primary transition-colors">
                 <Upload className="h-5 w-5 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
@@ -679,6 +678,22 @@ export function CreateNoteDialog({
                   onChange={handleFileChange}
                   className="hidden"
                   accept="image/*,.pdf,.doc,.docx"
+                />
+              </label>
+              <label
+                className="flex items-center justify-center gap-2 cursor-pointer border-2 border-dashed rounded-lg p-4 hover:border-primary transition-colors"
+                aria-label="Take photo with camera"
+                title="Take photo with camera"
+              >
+                <Camera className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground whitespace-nowrap">Take Photo</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  multiple
+                  onChange={handleFileChange}
+                  className="hidden"
                 />
               </label>
             </div>

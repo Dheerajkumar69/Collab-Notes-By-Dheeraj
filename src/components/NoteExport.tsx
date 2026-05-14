@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -5,12 +6,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, FileText, Code } from 'lucide-react';
+import { Download, FileText, Code, FileType, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface NoteExportProps {
   title: string;
   content: string;
+  authorName?: string | null;
+  groupName?: string;
+  createdAt?: string | null;
 }
 
 function htmlToMarkdown(html: string): string {
@@ -45,7 +49,8 @@ function htmlToMarkdown(html: string): string {
   return md;
 }
 
-export function NoteExport({ title, content }: NoteExportProps) {
+export function NoteExport({ title, content, authorName, groupName, createdAt }: NoteExportProps) {
+  const [exporting, setExporting] = useState(false);
   const downloadFile = (data: string, filename: string, type: string) => {
     const blob = new Blob([data], { type });
     const url = URL.createObjectURL(blob);
@@ -71,15 +76,36 @@ h1,h2,h3{color:#111}mark{background:#fef08a;padding:2px 4px}blockquote{border-le
     downloadFile(html, `${title.replace(/[^a-z0-9]/gi, '_')}.html`, 'text/html');
   };
 
+  const exportPDF = async () => {
+    setExporting(true);
+    const id = toast({ title: 'Generating PDF…', description: 'Loading engine' });
+    try {
+      const { exportNoteToPdf } = await import('@/lib/pdfExport');
+      await exportNoteToPdf(
+        { title, content, author_name: authorName, group_name: groupName, created_at: createdAt },
+        msg => id.update({ id: id.id, title: 'Generating PDF…', description: msg }),
+      );
+      id.update({ id: id.id, title: 'Downloaded', description: 'PDF saved' });
+    } catch (e: any) {
+      id.update({ id: id.id, title: 'PDF export failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
-          <Download className="h-3.5 w-3.5" />
+        <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" disabled={exporting}>
+          {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           Export
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
+        <DropdownMenuItem onClick={exportPDF} disabled={exporting}>
+          <FileType className="h-4 w-4 mr-2" />
+          PDF (.pdf)
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={exportMarkdown}>
           <Code className="h-4 w-4 mr-2" />
           Markdown (.md)
