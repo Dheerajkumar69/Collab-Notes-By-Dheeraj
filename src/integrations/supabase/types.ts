@@ -295,6 +295,8 @@ export type Database = {
           id: string
           is_completed: boolean
           note_id: string
+          recurrence: string
+          reminded: boolean
           title: string
           user_id: string
         }
@@ -305,6 +307,8 @@ export type Database = {
           id?: string
           is_completed?: boolean
           note_id: string
+          recurrence?: string
+          reminded?: boolean
           title: string
           user_id: string
         }
@@ -315,6 +319,8 @@ export type Database = {
           id?: string
           is_completed?: boolean
           note_id?: string
+          recurrence?: string
+          reminded?: boolean
           title?: string
           user_id?: string
         }
