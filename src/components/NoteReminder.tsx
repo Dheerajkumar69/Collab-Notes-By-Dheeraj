@@ -49,7 +49,7 @@ export function NoteReminder({ noteId, groupId, noteTitle }: NoteReminderProps) 
       .eq('note_id', noteId)
       .eq('user_id', user.id)
       .maybeSingle();
-    setReminder(data);
+    setReminder(data as Reminder | null);
     if (data) setSelectedDate(new Date(data.due_date));
   };
 
