@@ -89,28 +89,14 @@ async function renderHtmlToPdf(
     const pxToPt = usableWidth / canvas.width;
     const totalHeightPt = canvas.height * pxToPt;
 
-    let heightLeft = totalHeightPt;
-    let position = margin;
-    let isFirst = true;
-
+    // First slice
+    pdf.addImage(imgData, 'JPEG', margin, margin, usableWidth, totalHeightPt, undefined, 'FAST');
+    let heightLeft = totalHeightPt - usableHeight;
     while (heightLeft > 0) {
-      if (!isFirst || !opts.firstPage) {
-        if (!isFirst) pdf.addPage();
-      }
-      pdf.addImage(
-        imgData,
-        'JPEG',
-        margin,
-        position,
-        usableWidth,
-        totalHeightPt,
-        undefined,
-        'FAST',
-      );
+      pdf.addPage();
+      const y = margin - (totalHeightPt - heightLeft);
+      pdf.addImage(imgData, 'JPEG', margin, y, usableWidth, totalHeightPt, undefined, 'FAST');
       heightLeft -= usableHeight;
-      position = margin - (totalHeightPt - heightLeft);
-      isFirst = false;
-      if (heightLeft > 0) pdf.addPage();
     }
   } finally {
     container.remove();
