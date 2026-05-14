@@ -635,7 +635,13 @@ export default function NotePage() {
           <div className="flex flex-wrap items-center gap-2 mb-6">
             <NoteReminder noteId={note.id} groupId={group.id} noteTitle={note.title} />
             <AISummarize noteTitle={note.title} noteContent={note.content || ''} />
-            <NoteExport title={note.title} content={note.content || ''} />
+            <NoteExport
+              title={note.title}
+              content={note.content || ''}
+              authorName={author?.full_name || note.author_name}
+              groupName={group.name}
+              createdAt={note.created_at}
+            />
           </div>
 
           <Separator className="my-6" />
