@@ -388,14 +388,17 @@ export default function NotePage() {
                 </TooltipProvider>
               )}
 
-              {/* Unsaved changes indicator */}
-              {hasUnsavedChanges && (
-                <span className="text-xs text-amber-500 font-medium hidden sm:block">
-                  Unsaved changes
+              {!online && (
+                <span className="text-xs text-amber-500 font-medium inline-flex items-center gap-1">
+                  <CloudOff className="h-3 w-3" /> Offline
                 </span>
               )}
-
-              {note.updated_at && !hasUnsavedChanges && (
+              {online && pendingOffline > 0 && (
+                <span className="text-xs text-amber-500 font-medium inline-flex items-center gap-1">
+                  <Cloud className="h-3 w-3" /> Syncing {pendingOffline}…
+                </span>
+              )}
+              {note.updated_at && (
                 <span className="text-xs text-muted-foreground hidden sm:block">
                   Edited {format(new Date(note.updated_at), 'MMM d, yyyy')}
                 </span>
@@ -405,19 +408,6 @@ export default function NotePage() {
                 <Star className="h-4 w-4 text-yellow-500 fill-current" />
               )}
 
-              {/* Save button when editing */}
-              {isEditingContent && (
-                <Button 
-                  size="sm" 
-                  onClick={handleSaveContent} 
-                  disabled={saving || !hasUnsavedChanges}
-                  className="gap-1.5"
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Save</span>
-                </Button>
-              )}
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">
@@ -425,20 +415,11 @@ export default function NotePage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {canEdit && !isEditingContent && (
-                    <DropdownMenuItem onClick={() => {
-                      setEditContent(note.content || '');
-                      setIsEditingContent(true);
-                    }}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit Content
-                    </DropdownMenuItem>
-                  )}
                   <DropdownMenuItem onClick={handleTogglePin}>
                     <Pin className="h-4 w-4 mr-2" />
                     {note.is_pinned ? 'Unpin' : 'Pin'} Note
                   </DropdownMenuItem>
-                  {canEdit && (
+                  {isAuthor && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem 
