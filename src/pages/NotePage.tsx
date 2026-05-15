@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,7 +6,9 @@ import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { RichTextEditor, RichTextViewer } from '@/components/RichTextEditor';
+import { RichTextViewer } from '@/components/RichTextEditor';
+import { CollabEditor } from '@/components/editor/CollabEditor';
+import { decodeYjsState } from '@/lib/yjs/persistNote';
 import { NoteVersionHistory } from '@/components/NoteVersionHistory';
 import { AISummarize } from '@/components/AISummarize';
 import { NoteExport } from '@/components/NoteExport';
@@ -54,6 +56,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useDeleteNoteWithCleanup } from '@/hooks/useDeleteNoteWithCleanup';
 import { useNotePresence } from '@/hooks/useNotePresence';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { ensureOutboxAutoFlush, flushOutbox, outboxSize } from '@/lib/offline/notesOutbox';
+import { Cloud, CloudOff } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Lock as LockIcon } from 'lucide-react';
 
@@ -79,6 +84,8 @@ interface Note {
   lecture_number?: number | null;
   topic?: string | null;
   version?: number;
+  yjs_state?: unknown;
+  format?: string;
 }
 
 interface Group {
@@ -98,90 +105,37 @@ export default function NotePage() {
   const { groupId, noteId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const online = useOnlineStatus();
   
   const [note, setNote] = useState<Note | null>(null);
   const [group, setGroup] = useState<Group | null>(null);
   const [author, setAuthor] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [pendingOffline, setPendingOffline] = useState(0);
   
   // Editable states
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [isEditingContent, setIsEditingContent] = useState(false);
   const [editTitle, setEditTitle] = useState('');
-  const [editContent, setEditContent] = useState('');
   const [editLectureNumber, setEditLectureNumber] = useState<string>('');
   const [editTopic, setEditTopic] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [showAddLabel, setShowAddLabel] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
   const titleInputRef = useRef<HTMLInputElement>(null);
   const { deleteNoteWithCleanup } = useDeleteNoteWithCleanup();
   
-  const canEdit = note?.created_by === user?.id;
+  // With the new RLS policy, any group member can co-edit notes.
+  const canEdit = !!user && !!note;
+  const isAuthor = note?.created_by === user?.id;
 
-  const { others, otherEditor, setEditing } = useNotePresence(
+  const { others } = useNotePresence(
     noteId,
     author?.full_name || (user?.email?.split('@')[0] ?? 'User'),
     author?.avatar_url || null,
   );
-
-  // Broadcast editing flag whenever user enters/leaves edit mode
-  useEffect(() => {
-    setEditing(isEditingContent);
-    return () => { setEditing(false); };
-  }, [isEditingContent, setEditing]);
-
-  const handleSaveContent = useCallback(async () => {
-    if (!note) return;
-    setSaving(true);
-    try {
-      const expectedVersion = note.version ?? 1;
-      const { data, error } = await supabase
-        .from('notes')
-        .update({
-          content: editContent,
-          updated_at: new Date().toISOString(),
-          version: expectedVersion + 1,
-        })
-        .eq('id', note.id)
-        .eq('version', expectedVersion)
-        .select('id, version')
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!data) {
-        // Version mismatch — someone else saved first.
-        toast({
-          title: 'Save conflict',
-          description: 'Someone else updated this note. Reloading their version — copy your changes first.',
-          variant: 'destructive',
-        });
-        // Reload latest from server
-        const { data: fresh } = await supabase.from('notes').select('*').eq('id', note.id).single();
-        if (fresh) {
-          setNote(prev => prev ? { ...prev, content: fresh.content, version: fresh.version } : null);
-        }
-        return;
-      }
-      setNote(prev => prev ? { ...prev, content: editContent, version: data.version } : null);
-      setIsEditingContent(false);
-      setHasUnsavedChanges(false);
-      toast({ title: 'Saved', description: 'Content updated' });
-    } catch (error) {
-      toast({ title: 'Error', description: 'Failed to save content', variant: 'destructive' });
-    } finally {
-      setSaving(false);
-    }
-  }, [note, editContent]);
-
-  const handleContentChange = useCallback((newContent: string) => {
-    setEditContent(newContent);
-    setHasUnsavedChanges(true);
-  }, []);
 
   useEffect(() => {
     if (groupId && noteId) {
@@ -189,36 +143,21 @@ export default function NotePage() {
     }
   }, [groupId, noteId]);
 
-  // Keyboard shortcut: Ctrl+S to save
+  // Outbox: poll size + auto-flush on reconnect.
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        if (isEditingContent && hasUnsavedChanges) {
-          handleSaveContent();
-        }
-      }
-      // Escape to cancel editing
-      if (e.key === 'Escape' && isEditingContent) {
-        setEditContent(note?.content || '');
-        setIsEditingContent(false);
-        setHasUnsavedChanges(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isEditingContent, hasUnsavedChanges, handleSaveContent, note]);
+    ensureOutboxAutoFlush(({ ok }) => {
+      if (ok > 0) toast({ title: 'Synced offline changes', description: `${ok} note update${ok > 1 ? 's' : ''} pushed to server.` });
+      void outboxSize().then(setPendingOffline);
+    });
+    void outboxSize().then(setPendingOffline);
+    const id = window.setInterval(() => { void outboxSize().then(setPendingOffline); }, 3000);
+    return () => window.clearInterval(id);
+  }, []);
 
-  // Warn before leaving with unsaved changes
+  // When we go from offline -> online, force a flush attempt.
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+    if (online) { void flushOutbox().then(({ ok }) => { if (ok) void outboxSize().then(setPendingOffline); }); }
+  }, [online]);
 
   const fetchData = async () => {
     try {
@@ -251,7 +190,6 @@ export default function NotePage() {
       setNote(noteData);
       setGroup(groupResult.data);
       setEditTitle(noteData.title);
-      setEditContent(noteData.content || '');
       setEditLectureNumber(noteData.lecture_number?.toString() || '');
       setEditTopic(noteData.topic || '');
 
