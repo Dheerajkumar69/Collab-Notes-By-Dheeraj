@@ -16,6 +16,11 @@ import {
 } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import type { Editor, Range } from '@tiptap/core';
+// Type-only side-effect imports so the Commands<> interface is augmented for TS.
+import type {} from '@tiptap/extension-table';
+import type {} from '@tiptap/extension-image';
+import type {} from '@tiptap/extension-task-list';
+import type {} from '@tiptap/extension-link';
 
 export interface SlashItem {
   title: string;
