@@ -28,11 +28,10 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 function u8ToB64(u8: Uint8Array): string {
   let s = '';
   for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
-  // btoa is binary-safe with 0..255 char codes
-  return typeof btoa !== 'undefined' ? btoa(s) : Buffer.from(u8).toString('base64');
+  return btoa(s);
 }
 function b64ToU8(b64: string): Uint8Array {
-  const s = typeof atob !== 'undefined' ? atob(b64) : Buffer.from(b64, 'base64').toString('binary');
+  const s = atob(b64);
   const u8 = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
   return u8;
