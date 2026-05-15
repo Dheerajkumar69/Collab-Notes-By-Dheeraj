@@ -29,3 +29,10 @@ Enable realtime on user_presence. Add RLS policies for all tables.
 - Mobile camera capture for OCR (input capture="environment").
 - Reminders fire via process-reminders edge function on pg_cron every 5 min, with snooze + recurrence.
 - Soft co-editing (Path A): Realtime presence avatars + editing broadcast + version-based conflict detection on save (no Yjs/Hocuspocus).
+
+## Shipped (production-grade collab pass)
+- **Real CRDT live cursors**: Yjs + custom `SupabaseYjsProvider` over Realtime broadcast; awareness-based remote cursors via `@tiptap/extension-collaboration-cursor`. No Hocuspocus needed.
+- **Local-first**: `y-indexeddb` persists every keystroke locally; `notesOutbox` (IndexedDB) queues offline metadata writes and auto-flushes on reconnect.
+- **Slash-menu Notion-lite editor** (`CollabEditor`): tables (resizable), task lists, code blocks (lowlight syntax highlighting), images, links, callouts (4 variants), drag-handles, character count, slash menu.
+- **Lazy migration**: existing HTML notes seed a Y.Doc the first time they're opened; `notes.yjs_state bytea` + `format` columns store the CRDT snapshot. Old notes keep working.
+- **RLS**: group members (not just authors) can now update notes — required for true co-edit.

@@ -420,6 +420,7 @@ export type Database = {
           due_date: string | null
           edit_requests: Json | null
           folder_id: string | null
+          format: string
           group_id: string
           id: string
           is_archived: boolean | null
@@ -433,6 +434,7 @@ export type Database = {
           topic: string | null
           updated_at: string | null
           version: number
+          yjs_state: string | null
         }
         Insert: {
           attachments?: Json | null
@@ -444,6 +446,7 @@ export type Database = {
           due_date?: string | null
           edit_requests?: Json | null
           folder_id?: string | null
+          format?: string
           group_id: string
           id?: string
           is_archived?: boolean | null
@@ -457,6 +460,7 @@ export type Database = {
           topic?: string | null
           updated_at?: string | null
           version?: number
+          yjs_state?: string | null
         }
         Update: {
           attachments?: Json | null
@@ -468,6 +472,7 @@ export type Database = {
           due_date?: string | null
           edit_requests?: Json | null
           folder_id?: string | null
+          format?: string
           group_id?: string
           id?: string
           is_archived?: boolean | null
@@ -481,6 +486,7 @@ export type Database = {
           topic?: string | null
           updated_at?: string | null
           version?: number
+          yjs_state?: string | null
         }
         Relationships: [
           {
