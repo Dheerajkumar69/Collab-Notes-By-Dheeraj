@@ -696,8 +696,6 @@ export default function NotePage() {
                     if (error) throw error;
                     setNote({ ...note, title, content });
                     setEditTitle(title);
-                    setEditContent(content);
-                    setHasUnsavedChanges(false);
                   } catch (err) {
                     toast({ title: 'Error', description: 'Failed to restore version', variant: 'destructive' });
                   }
@@ -708,65 +706,21 @@ export default function NotePage() {
 
           {/* Content Area */}
           <div className="min-h-[200px]">
-            {otherEditor && !isEditingContent && (
-              <div className="mb-3 flex items-center gap-2 p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-sm">
-                <LockIcon className="h-4 w-4 text-amber-500" />
-                <span><strong>{otherEditor.name}</strong> is editing — your save may conflict.</span>
-              </div>
-            )}
-            {isEditingContent && canEdit ? (
-              <div className="space-y-3">
-                <RichTextEditor
-                  content={editContent}
-                  onChange={handleContentChange}
-                  placeholder="Write your notes here..."
-                />
-                <div className="flex items-center gap-2">
-                  <Button onClick={handleSaveContent} disabled={saving || !hasUnsavedChanges}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    onClick={() => {
-                      setEditContent(note.content || '');
-                      setIsEditingContent(false);
-                      setHasUnsavedChanges(false);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <span className="text-xs text-muted-foreground ml-2">
-                    Ctrl+S to save · Esc to cancel
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div 
-                className={`relative group ${canEdit ? 'cursor-text hover:bg-muted/30 rounded-lg p-4 -m-4 transition-colors' : ''}`}
-                onClick={() => {
-                  if (canEdit) {
-                    setEditContent(note.content || '');
-                    setIsEditingContent(true);
-                  }
+            {canEdit ? (
+              <CollabEditor
+                noteId={note.id}
+                initialHtml={note.content || ''}
+                initialYjsState={decodeYjsState(note.yjs_state)}
+                currentUser={{
+                  id: user!.id,
+                  name: author?.full_name || user?.email?.split('@')[0] || 'User',
                 }}
-              >
-                {canEdit && (
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
-                  </div>
-                )}
-                {note.content ? (
-                  <RichTextViewer content={note.content} />
-                ) : (
-                  <p className="text-muted-foreground italic">
-                    {canEdit ? 'Click to add content...' : 'No content yet.'}
-                  </p>
-                )}
-              </div>
+                editable={true}
+              />
+            ) : note.content ? (
+              <RichTextViewer content={note.content} />
+            ) : (
+              <p className="text-muted-foreground italic">No content yet.</p>
             )}
           </div>
 
