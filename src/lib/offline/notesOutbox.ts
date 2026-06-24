@@ -17,21 +17,48 @@
 const DB_NAME = 'collab-notes-outbox';
 const DB_VERSION = 1;
 const STORE = 'note_updates';
+/** Hard ceiling on queue size to keep a hostile/offline tab from filling IndexedDB. */
+const MAX_ENTRIES = 500;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
+let flushInFlight: Promise<{ ok: number; failed: number }> | null = null;
 
 function openDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('IndexedDB unavailable'));
+      return;
+    }
     const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onblocked = () => {
+      // Another tab is holding an older version open; surface as error so caller
+      // can fall back to a network write instead of hanging forever.
+      reject(new Error('Outbox DB upgrade blocked by another tab'));
+    };
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE)) {
         db.createObjectStore(STORE, { keyPath: 'noteId' });
       }
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      // If the schema changes elsewhere, close gracefully so the next call reopens.
+      db.onversionchange = () => {
+        try { db.close(); } catch { /* ignore */ }
+        dbPromise = null;
+      };
+      db.onclose = () => { dbPromise = null; };
+      resolve(db);
+    };
+    req.onerror = () => {
+      dbPromise = null;
+      reject(req.error);
+    };
+  }).catch((err) => {
+    dbPromise = null;
+    throw err;
   });
   return dbPromise;
 }
@@ -43,13 +70,27 @@ interface OutboxEntry {
 }
 
 export async function enqueueNoteUpdate(noteId: string, payload: Record<string, unknown>): Promise<void> {
+  if (!noteId) throw new Error('enqueueNoteUpdate: noteId required');
   const db = await openDb();
   return new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
+    let tx: IDBTransaction;
+    try {
+      tx = db.transaction(STORE, 'readwrite');
+    } catch (e) {
+      reject(e);
+      return;
+    }
     const store = tx.objectStore(STORE);
-    const get = store.get(noteId);
-    get.onsuccess = () => {
-      const existing = (get.result as OutboxEntry | undefined)?.payload ?? {};
+    const countReq = store.count();
+    const getReq = store.get(noteId);
+    getReq.onsuccess = () => {
+      const existing = (getReq.result as OutboxEntry | undefined)?.payload ?? {};
+      const isNewEntry = getReq.result === undefined;
+      // Drop new entries (not updates to existing notes) once we hit the ceiling
+      // to avoid unbounded growth, but never reject an update for an already-queued note.
+      if (isNewEntry && (countReq.result ?? 0) >= MAX_ENTRIES) {
+        return;
+      }
       const merged: OutboxEntry = {
         noteId,
         payload: { ...existing, ...payload },
@@ -57,8 +98,10 @@ export async function enqueueNoteUpdate(noteId: string, payload: Record<string, 
       };
       store.put(merged);
     };
+    getReq.onerror = () => reject(getReq.error);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error ?? new Error('Outbox tx aborted'));
   });
 }
 
@@ -93,9 +136,13 @@ export async function outboxSize(): Promise<number> {
  * circular module init.
  */
 export async function flushOutbox(): Promise<{ ok: number; failed: number }> {
+  if (flushInFlight) return flushInFlight;
+  flushInFlight = (async () => {
   const { supabase } = await import('@/integrations/supabase/client');
   const entries = await listOutbox();
   let ok = 0, failed = 0;
+  // Push oldest first so write order is preserved.
+  entries.sort((a, b) => a.queuedAt - b.queuedAt);
   for (const e of entries) {
     try {
       const { error } = await supabase
@@ -110,6 +157,12 @@ export async function flushOutbox(): Promise<{ ok: number; failed: number }> {
     }
   }
   return { ok, failed };
+  })();
+  try {
+    return await flushInFlight;
+  } finally {
+    flushInFlight = null;
+  }
 }
 
 let listenersAttached = false;
@@ -120,12 +173,27 @@ export function ensureOutboxAutoFlush(onFlushed?: (r: { ok: number; failed: numb
   listenersAttached = true;
   const handler = async () => {
     if (!navigator.onLine) return;
-    const r = await flushOutbox();
-    if (r.ok || r.failed) onFlushed?.(r);
+    try {
+      const r = await flushOutbox();
+      if (r.ok || r.failed) onFlushed?.(r);
+    } catch (err) {
+      console.warn('[outbox] flush failed', err);
+    }
   };
   window.addEventListener('online', handler);
+  // Re-check when the tab becomes visible — laptops often wake without firing 'online'.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void handler();
+  });
   // Also flush on startup in case last session ended offline.
   if (navigator.onLine) {
     setTimeout(handler, 1500);
   }
+}
+
+/** Test-only: reset module state between tests. */
+export function __resetOutboxForTests() {
+  dbPromise = null;
+  flushInFlight = null;
+  listenersAttached = false;
 }

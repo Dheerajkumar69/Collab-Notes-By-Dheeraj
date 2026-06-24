@@ -50,6 +50,9 @@ export class SupabaseYjsProvider {
   private channel: RealtimeChannel | null = null;
   private subscribed = false;
   private destroyed = false;
+  private reconnectAttempt = 0;
+  private reconnectTimer: number | null = null;
+  private onOnline: (() => void) | null = null;
   private onDocUpdate: (update: Uint8Array, origin: unknown) => void;
   private onAwarenessUpdate: (changes: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => void;
   private onUnload: () => void;
@@ -81,6 +84,13 @@ export class SupabaseYjsProvider {
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('beforeunload', this.onUnload);
+      // Reconnect aggressively when network returns.
+      this.onOnline = () => {
+        if (this.destroyed) return;
+        this.reconnectAttempt = 0;
+        this.reconnect();
+      };
+      window.addEventListener('online', this.onOnline);
     }
 
     this.connect();
@@ -98,8 +108,10 @@ export class SupabaseYjsProvider {
     channel.on('broadcast', { event: 'query-aw' }, () => this.replyAwareness());
 
     channel.subscribe(status => {
+      if (this.destroyed) return;
       if (status === 'SUBSCRIBED') {
         this.subscribed = true;
+        this.reconnectAttempt = 0;
         // Initiate y-protocols sync step 1.
         const enc = encoding.createEncoder();
         syncProtocol.writeSyncStep1(enc, this.doc);
@@ -109,10 +121,33 @@ export class SupabaseYjsProvider {
         // Push our own awareness state.
         const awPayload = encodeAwarenessUpdate(this.awareness, [this.doc.clientID]);
         this.broadcast('awareness', { payload: u8ToB64(awPayload) });
-      } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+      } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         this.subscribed = false;
+        this.scheduleReconnect();
       }
     });
+  }
+
+  private scheduleReconnect() {
+    if (this.destroyed || this.reconnectTimer != null) return;
+    // 1s, 2s, 4s, 8s ... capped at 30s, with jitter.
+    const base = Math.min(30000, 1000 * Math.pow(2, this.reconnectAttempt));
+    const delay = base + Math.floor(Math.random() * 500);
+    this.reconnectAttempt++;
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null;
+      this.reconnect();
+    }, delay);
+  }
+
+  private reconnect() {
+    if (this.destroyed) return;
+    if (this.channel) {
+      try { supabase.removeChannel(this.channel); } catch { /* ignore */ }
+      this.channel = null;
+    }
+    this.subscribed = false;
+    this.connect();
   }
 
   private broadcast(event: string, payload: Record<string, unknown>) {
@@ -166,10 +201,15 @@ export class SupabaseYjsProvider {
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    if (this.reconnectTimer != null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     try { this.doc.off('update', this.onDocUpdate); } catch { /* ignore */ }
     try { this.awareness.off('update', this.onAwarenessUpdate); } catch { /* ignore */ }
     if (typeof window !== 'undefined') {
       window.removeEventListener('beforeunload', this.onUnload);
+      if (this.onOnline) window.removeEventListener('online', this.onOnline);
     }
     try { removeAwarenessStates(this.awareness, [this.doc.clientID], 'provider destroy'); } catch { /* ignore */ }
     if (this.channel) {
