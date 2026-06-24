@@ -11,7 +11,10 @@
  */
 import * as Y from 'yjs';
 import { supabase } from '@/integrations/supabase/client';
-import { enqueueNoteUpdate } from '@/lib/offline/notesOutbox';
+import { enqueueNoteUpdate, flushOutbox } from '@/lib/offline/notesOutbox';
+
+/** 8 MB — well above any realistic note, but small enough to keep PostgREST happy. */
+const MAX_YJS_STATE_BYTES = 8 * 1024 * 1024;
 
 export interface PersistOptions {
   noteId: string;
@@ -33,6 +36,11 @@ export function createDebouncedPersister(opts: PersistOptions, debounceMs = 1500
     pending = false;
     try {
       const state = Y.encodeStateAsUpdate(opts.doc);
+      if (state.byteLength > MAX_YJS_STATE_BYTES) {
+        // Don't silently corrupt the row — surface and skip this snapshot.
+        opts.onError?.(new Error(`Yjs state exceeds ${MAX_YJS_STATE_BYTES} bytes (${state.byteLength})`));
+        return;
+      }
       // Convert Uint8Array -> hex for bytea (\x prefix) so PostgREST stores it correctly.
       const hex = '\\x' + Array.from(state).map(b => b.toString(16).padStart(2, '0')).join('');
       const html = opts.getHtml();
@@ -43,9 +51,18 @@ export function createDebouncedPersister(opts: PersistOptions, debounceMs = 1500
         updated_at: new Date().toISOString(),
       };
 
+      const queueOffline = async () => {
+        try {
+          await enqueueNoteUpdate(opts.noteId, payload);
+          opts.onSaved?.({ savedAt: new Date(), offline: true });
+        } catch (err) {
+          // IndexedDB unavailable (private mode, quota, blocked upgrade). Surface.
+          opts.onError?.(err);
+        }
+      };
+
       if (!opts.online) {
-        await enqueueNoteUpdate(opts.noteId, payload);
-        opts.onSaved?.({ savedAt: new Date(), offline: true });
+        await queueOffline();
       } else {
         const { error } = await supabase
           .from('notes')
@@ -53,10 +70,11 @@ export function createDebouncedPersister(opts: PersistOptions, debounceMs = 1500
           .eq('id', opts.noteId);
         if (error) {
           // Network glitched mid-write — fall back to outbox.
-          await enqueueNoteUpdate(opts.noteId, payload);
-          opts.onSaved?.({ savedAt: new Date(), offline: true });
+          await queueOffline();
         } else {
           opts.onSaved?.({ savedAt: new Date(), offline: false });
+          // Opportunistically drain any older queued entries now that we're online.
+          void flushOutbox().catch(() => { /* best-effort */ });
         }
       }
     } catch (e) {
@@ -93,8 +111,13 @@ export function decodeYjsState(value: unknown): Uint8Array | null {
   if (typeof value === 'string') {
     if (value.startsWith('\\x')) {
       const hex = value.slice(2);
+      if (hex.length % 2 !== 0) return null;
       const u8 = new Uint8Array(hex.length / 2);
-      for (let i = 0; i < u8.length; i++) u8[i] = parseInt(hex.substr(i * 2, 2), 16);
+      for (let i = 0; i < u8.length; i++) {
+        const byte = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+        if (Number.isNaN(byte)) return null;
+        u8[i] = byte;
+      }
       return u8;
     }
     // base64
