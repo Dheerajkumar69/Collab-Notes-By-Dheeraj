@@ -25,7 +25,7 @@ let flushInFlight: Promise<{ ok: number; failed: number }> | null = null;
 
 function openDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
+  const p = new Promise<IDBDatabase>((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
       reject(new Error('IndexedDB unavailable'));
       return;
@@ -56,10 +56,11 @@ function openDb(): Promise<IDBDatabase> {
       dbPromise = null;
       reject(req.error);
     };
-  }).catch((err) => {
+  });
+  dbPromise = p.catch((err) => {
     dbPromise = null;
     throw err;
-  });
+  }) as Promise<IDBDatabase>;
   return dbPromise;
 }
 
