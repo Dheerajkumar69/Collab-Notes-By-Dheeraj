@@ -496,17 +496,15 @@ export default function GroupPage() {
               <Badge variant="secondary" className="bg-white/20 text-white border-0">
                 {notes.length} {notes.length === 1 ? 'note' : 'notes'}
               </Badge>
-              {isCreator && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={copyInviteCode}
-                  className="text-white hover:bg-white/25 bg-black/50 backdrop-blur-md border border-white/20 shadow-lg h-7 px-3"
-                >
-                  <Copy className="h-3 w-3 mr-1" />
-                  Copy Invite Code
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={copyInviteCode}
+                className="text-white hover:bg-white/25 bg-black/50 backdrop-blur-md border border-white/20 shadow-lg h-7 px-3"
+              >
+                <Copy className="h-3 w-3 mr-1" />
+                Copy Invite Code
+              </Button>
             </div>
           </div>
         </div>
