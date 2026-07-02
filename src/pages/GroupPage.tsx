@@ -451,11 +451,12 @@ export default function GroupPage() {
                : {}
            }
          >
-           {/* Dark overlay for background images so buttons stay visible */}
-           {group.background_image_url && (
-             <div className="absolute inset-0 bg-black/40" />
-           )}
-           <div className="max-w-4xl mx-auto relative z-10">
+            {/* Dark overlay for background images so buttons stay visible.
+                pointer-events-none guarantees clicks always reach the buttons. */}
+            {group.background_image_url && (
+              <div className="absolute inset-0 bg-black/50 pointer-events-none z-0" />
+            )}
+            <div className="max-w-4xl mx-auto relative z-20">
              <div className="flex items-start justify-between mb-4">
                <div>
                  <h1 className="text-4xl font-bold mb-2">{group.name}</h1>
@@ -463,14 +464,14 @@ export default function GroupPage() {
                    <p className="text-white/90">{group.description}</p>
                  )}
                </div>
-               <div className="flex gap-2">
+                <div className="flex gap-2 relative z-20">
                  {isCreator && (
                    <>
                      <Button
                        variant="ghost"
                        size="icon"
                        onClick={() => setShowSettings(true)}
-                        className="text-white hover:bg-white/20 bg-black/30 backdrop-blur-sm"
+                         className="text-white hover:bg-white/25 bg-black/50 backdrop-blur-md border border-white/20 shadow-lg"
                         aria-label="Group settings"
                      >
                        <Settings className="h-5 w-5" />
@@ -479,7 +480,7 @@ export default function GroupPage() {
                        variant="ghost"
                        size="icon"
                        onClick={() => setShowDeleteDialog(true)}
-                       className="text-white hover:bg-white/20 bg-black/30 backdrop-blur-sm"
+                        className="text-white hover:bg-white/25 bg-black/50 backdrop-blur-md border border-white/20 shadow-lg"
                         aria-label="Delete group"
                      >
                        <Trash2 className="h-5 w-5" />
@@ -488,7 +489,7 @@ export default function GroupPage() {
                  )}
                </div>
              </div>
-            <div className="flex gap-4 text-sm">
+             <div className="flex gap-4 text-sm relative z-20 flex-wrap items-center">
               <Badge variant="secondary" className="bg-white/20 text-white border-0">
                 {members.length} {members.length === 1 ? 'member' : 'members'}
               </Badge>
@@ -500,7 +501,7 @@ export default function GroupPage() {
                   variant="ghost"
                   size="sm"
                   onClick={copyInviteCode}
-                  className="text-white hover:bg-white/20 h-7 px-3"
+                  className="text-white hover:bg-white/25 bg-black/50 backdrop-blur-md border border-white/20 shadow-lg h-7 px-3"
                 >
                   <Copy className="h-3 w-3 mr-1" />
                   Copy Invite Code

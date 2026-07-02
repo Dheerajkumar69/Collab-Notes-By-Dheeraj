@@ -1,0 +1,11 @@
+# Netlify config — SPA fallback so client-side routes (e.g. /group/:id/note/:id)
+# do not 404 on hard reload or when a deep link is opened directly.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
