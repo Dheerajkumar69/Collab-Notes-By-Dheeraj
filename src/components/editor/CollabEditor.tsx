@@ -198,10 +198,21 @@ export function CollabEditor({
   // Flush pending save before unmount + on tab hide.
   useEffect(() => {
     const flush = () => persisterRef.current?.flush();
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush(); };
+    // Belt-and-suspenders: guarantee a snapshot at least every 10 seconds
+    // while the tab is open so an accidental close never loses > 10s of work.
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') flush();
+    }, 10_000);
     window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', flush);
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       flush();
+      window.clearInterval(interval);
       window.removeEventListener('pagehide', flush);
+      window.removeEventListener('beforeunload', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
 
