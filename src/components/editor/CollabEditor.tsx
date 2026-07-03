@@ -19,7 +19,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Highlight from '@tiptap/extension-highlight';
 import Underline from '@tiptap/extension-underline';
 import Collaboration from '@tiptap/extension-collaboration';
-import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
+import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
 import { TaskList } from '@tiptap/extension-task-list';
 import { TaskItem } from '@tiptap/extension-task-item';
@@ -146,8 +146,8 @@ export function CollabEditor({
       GlobalDragHandle.configure({ dragHandleWidth: 20 }),
       AutoJoiner,
       Collaboration.configure({ document: ydoc }),
-      CollaborationCursor.configure({
-        provider: { awareness } as never, // tiptap only needs the awareness object.
+      CollaborationCaret.configure({
+        provider: { awareness } as never, // Caret extension only reads provider.awareness.
         user: { name: currentUser.name, color: currentUser.color || userColor(currentUser.id) },
       }),
     ],
