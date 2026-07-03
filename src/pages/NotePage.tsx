@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { RichTextViewer } from '@/components/RichTextEditor';
-import { CollabEditor } from '@/components/editor/CollabEditor';
+import { CollabEditorSafe } from '@/components/editor/CollabEditorSafe';
 import { decodeYjsState } from '@/lib/yjs/persistNote';
 import { NoteVersionHistory } from '@/components/NoteVersionHistory';
 import { AISummarize } from '@/components/AISummarize';
@@ -707,7 +707,7 @@ export default function NotePage() {
           {/* Content Area */}
           <div className="min-h-[200px]">
             {canEdit ? (
-              <CollabEditor
+              <CollabEditorSafe
                 noteId={note.id}
                 initialHtml={note.content || ''}
                 initialYjsState={decodeYjsState(note.yjs_state)}
