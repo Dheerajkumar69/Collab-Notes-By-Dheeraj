@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -15,10 +15,13 @@ import {
   Users,
   Bell,
   Shield,
-  Keyboard
+  Keyboard,
+  MessageSquare,
+  Clock
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGroups } from '@/hooks/supabase-hooks';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 interface CommandPaletteProps {
@@ -40,12 +43,54 @@ export function CommandPalette({
   const { user, signOut } = useAuth();
   const { data: groups } = useGroups();
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<
+    Array<{ kind: 'note' | 'message'; id: string; group_id: string; group_name: string; title: string }>
+  >([]);
+  const [recent, setRecent] = useState<
+    Array<{ kind: 'note' | 'group'; id: string; title: string; groupId?: string }>
+  >(() => {
+    try {
+      return JSON.parse(localStorage.getItem('cmdk:recent') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  // Debounced full-text search across notes + messages
+  useEffect(() => {
+    if (!open || !query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    const q = query.trim();
+    const handle = setTimeout(async () => {
+      const { data } = await supabase.rpc('search_all', { q });
+      setSearchResults((data as typeof searchResults) || []);
+    }, 200);
+    return () => clearTimeout(handle);
+  }, [query, open]);
+
+  const pushRecent = useCallback(
+    (item: { kind: 'note' | 'group'; id: string; title: string; groupId?: string }) => {
+      setRecent((prev) => {
+        const next = [item, ...prev.filter((r) => !(r.id === item.id && r.kind === item.kind))].slice(0, 5);
+        localStorage.setItem('cmdk:recent', JSON.stringify(next));
+        return next;
+      });
+    },
+    []
+  );
 
   const handleSelect = useCallback((callback: () => void) => {
     onOpenChange(false);
     // Small delay to allow dialog to close
     setTimeout(callback, 150);
   }, [onOpenChange]);
+
+  useEffect(() => {
+    if (!open) setQuery('');
+  }, [open]);
 
   const shortcuts = [
     { keys: ['⌘', 'K'], description: 'Open command palette' },
@@ -97,10 +142,70 @@ export function CommandPalette({
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <Command className="rounded-lg border shadow-md">
-        <CommandInput placeholder="Type a command or search..." />
+        <CommandInput
+          placeholder="Search notes, messages, groups — or type a command…"
+          value={query}
+          onValueChange={setQuery}
+        />
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
-          
+
+          {/* Full-text search results */}
+          {query.trim() && searchResults.length > 0 && (
+            <>
+              <CommandGroup heading="Search results">
+                {searchResults.slice(0, 8).map((r) => (
+                  <CommandItem
+                    key={`${r.kind}-${r.id}`}
+                    onSelect={() =>
+                      handleSelect(() => {
+                        if (r.kind === 'note') {
+                          pushRecent({ kind: 'note', id: r.id, title: r.title, groupId: r.group_id });
+                          navigate(`/group/${r.group_id}/note/${r.id}`);
+                        } else {
+                          navigate(`/group/${r.group_id}`);
+                        }
+                      })
+                    }
+                  >
+                    {r.kind === 'note' ? (
+                      <FileText className="mr-2 h-4 w-4" />
+                    ) : (
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                    )}
+                    <span className="truncate">{r.title}</span>
+                    <Badge variant="outline" className="ml-auto text-[10px]">
+                      {r.group_name}
+                    </Badge>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+              <CommandSeparator />
+            </>
+          )}
+
+          {/* Recent */}
+          {!query.trim() && recent.length > 0 && (
+            <>
+              <CommandGroup heading="Recent">
+                {recent.map((r) => (
+                  <CommandItem
+                    key={`recent-${r.kind}-${r.id}`}
+                    onSelect={() =>
+                      handleSelect(() =>
+                        navigate(r.kind === 'note' ? `/group/${r.groupId}/note/${r.id}` : `/group/${r.id}`)
+                      )
+                    }
+                  >
+                    <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <span className="truncate">{r.title}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+              <CommandSeparator />
+            </>
+          )}
+
           {/* Quick Actions */}
           <CommandGroup heading="Quick Actions">
             {onCreateGroup && (

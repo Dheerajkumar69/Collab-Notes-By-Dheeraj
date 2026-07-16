@@ -243,6 +243,7 @@ export type Database = {
           message: string
           reactions: Json | null
           reply_to: string | null
+          search_vector: unknown
           user_id: string
           user_name: string
         }
@@ -255,6 +256,7 @@ export type Database = {
           message: string
           reactions?: Json | null
           reply_to?: string | null
+          search_vector?: unknown
           user_id: string
           user_name: string
         }
@@ -267,6 +269,7 @@ export type Database = {
           message?: string
           reactions?: Json | null
           reply_to?: string | null
+          search_vector?: unknown
           user_id?: string
           user_name?: string
         }
@@ -428,6 +431,7 @@ export type Database = {
           labels: string[] | null
           lecture_number: number | null
           reactions: Json | null
+          search_vector: unknown
           telegram_file_id: string | null
           telegram_message_id: string | null
           title: string
@@ -454,6 +458,7 @@ export type Database = {
           labels?: string[] | null
           lecture_number?: number | null
           reactions?: Json | null
+          search_vector?: unknown
           telegram_file_id?: string | null
           telegram_message_id?: string | null
           title: string
@@ -480,6 +485,7 @@ export type Database = {
           labels?: string[] | null
           lecture_number?: number | null
           reactions?: Json | null
+          search_vector?: unknown
           telegram_file_id?: string | null
           telegram_message_id?: string | null
           title?: string
@@ -507,30 +513,39 @@ export type Database = {
       }
       notifications: {
         Row: {
+          count: number
           created_at: string | null
+          group_key: string | null
           id: string
           is_read: boolean | null
           link: string | null
           message: string
           recipient_email: string | null
+          updated_at: string
           user_id: string
         }
         Insert: {
+          count?: number
           created_at?: string | null
+          group_key?: string | null
           id?: string
           is_read?: boolean | null
           link?: string | null
           message: string
           recipient_email?: string | null
+          updated_at?: string
           user_id: string
         }
         Update: {
+          count?: number
           created_at?: string | null
+          group_key?: string | null
           id?: string
           is_read?: boolean | null
           link?: string | null
           message?: string
           recipient_email?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -542,6 +557,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          onboarded_at: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -549,6 +565,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          onboarded_at?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -556,6 +573,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          onboarded_at?: string | null
         }
         Relationships: []
       }
@@ -677,9 +695,23 @@ export type Database = {
         Args: { p_invite_code: string; p_user_email?: string }
         Returns: Json
       }
+      mark_all_notifications_read: { Args: never; Returns: number }
       remove_group_member: {
         Args: { p_email: string; p_group_id: string }
         Returns: Json
+      }
+      search_all: {
+        Args: { q: string }
+        Returns: {
+          created_at: string
+          group_id: string
+          group_name: string
+          id: string
+          kind: string
+          rank: number
+          snippet: string
+          title: string
+        }[]
       }
     }
     Enums: {

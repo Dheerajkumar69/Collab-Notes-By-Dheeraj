@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,20 @@ export default function Dashboard() {
   const { data: groups = [], isLoading: groupsLoading, isError: groupsError, refetch: refetchGroups } = useGroups();
   const { data: userProfile, isLoading: profileLoading, isError: profileError, refetch: refetchProfile } = useProfile();
   const { data: stats = { groups: 0, notes: 0, thisWeek: 0 }, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useStats();
+  const navigate = useNavigate();
+
+  // First-run redirect: brand new user with no onboarding + no groups → wizard
+  useEffect(() => {
+    if (
+      !profileLoading &&
+      !groupsLoading &&
+      userProfile &&
+      !(userProfile as { onboarded_at?: string | null }).onboarded_at &&
+      (groups as unknown[]).length === 0
+    ) {
+      navigate('/onboarding', { replace: true });
+    }
+  }, [profileLoading, groupsLoading, userProfile, groups, navigate]);
 
   // Enable realtime updates for groups
   useRealtimeGroups();

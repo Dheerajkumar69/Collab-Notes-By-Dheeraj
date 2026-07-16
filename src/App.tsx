@@ -11,6 +11,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import Onboarding from "./pages/Onboarding";
 import GroupPage from "./pages/GroupPage";
 import NotePage from "./pages/NotePage";
 import AllNotes from "./pages/AllNotes";
@@ -53,6 +54,7 @@ const App = () => (
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/help" element={<Help />} />
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
                 <Route path="/group/:id" element={<ProtectedRoute><GroupPage /></ProtectedRoute>} />
                 <Route path="/group/:groupId/note/:noteId" element={<ProtectedRoute><NotePage /></ProtectedRoute>} />
                 <Route path="/all-notes" element={<ProtectedRoute><AllNotes /></ProtectedRoute>} />
