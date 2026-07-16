@@ -126,8 +126,9 @@ export const useNotifications = () => {
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
+        .order('updated_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(50);
 
       if (error) throw error;
       return data || [];
@@ -147,6 +148,37 @@ export const useMarkNotificationRead = () => {
         .update({ is_read: true })
         .eq('id', notificationId);
 
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+    },
+  });
+};
+
+export const useMarkAllNotificationsRead = () => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('mark_all_notifications_read');
+      if (error) throw error;
+      return data as number;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+    },
+  });
+};
+
+export const useDismissNotification = () => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('notifications').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
