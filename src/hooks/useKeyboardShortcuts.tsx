@@ -6,6 +6,7 @@ interface ShortcutHandlers {
     onSearch?: () => void;
     onCreateGroup?: () => void;
     onOpenCommandPalette?: () => void;
+    onOpenShortcuts?: () => void;
 }
 
 /**
@@ -74,7 +75,11 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers = {}) {
         if (e.shiftKey && e.key === '?') {
             if (!isTyping) {
                 e.preventDefault();
-                navigate('/help');
+                if (handlers.onOpenShortcuts) {
+                    handlers.onOpenShortcuts();
+                } else {
+                    navigate('/help');
+                }
             }
             return;
         }
