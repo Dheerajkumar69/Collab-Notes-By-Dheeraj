@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, Home, FileText, Shield, Sun, Moon, Menu, User, LogOut } from 'lucide-react';
+import { Home, FileText, Shield, Sun, Moon, Menu, User, LogOut } from 'lucide-react';
 import logo from '@/assets/collabnotes-logo.png';
 import { Button } from './ui/button';
 import {
@@ -15,13 +15,12 @@ import {
   SheetContent,
   SheetTrigger,
 } from './ui/sheet';
-import { Badge } from './ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDistanceToNow } from 'date-fns';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeSubscription';
-import { useNotifications, useMarkNotificationRead, useProfile } from '@/hooks/supabase-hooks';
+import { useProfile } from '@/hooks/supabase-hooks';
 import { InstallPrompt } from './InstallPrompt';
+import { NotificationsPanel } from './NotificationsPanel';
 
 export const Layout = ({ children }: { children: ReactNode }) => {
   const { user, signOut } = useAuth();
@@ -29,10 +28,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Use react-query hooks for data
-  const { data: notifications = [] } = useNotifications();
   const { data: userProfile } = useProfile();
-  const markAsReadMutation = useMarkNotificationRead();
 
   // Enable realtime updates for notifications
   useRealtimeNotifications();
@@ -75,13 +71,6 @@ export const Layout = ({ children }: { children: ReactNode }) => {
       document.documentElement.classList.remove('dark');
     }
   };
-
-  const markAsRead = async (notificationId: string, link: string | null) => {
-    markAsReadMutation.mutate(notificationId);
-    if (link) navigate(link);
-  };
-
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const NavLinks = () => (
     <>
@@ -126,42 +115,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
               {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
             </Button>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
-                  <Bell size={18} />
-                  {unreadCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                      {unreadCount}
-                    </Badge>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80">
-                <div className="p-2 font-semibold">Notifications</div>
-                <DropdownMenuSeparator />
-                {notifications.length === 0 ? (
-                  <div className="p-4 text-sm text-muted-foreground text-center">
-                    No notifications
-                  </div>
-                ) : (
-                  notifications.map((notification) => (
-                    <DropdownMenuItem
-                      key={notification.id}
-                      className={`p-3 cursor-pointer ${!notification.is_read ? 'bg-muted/50' : ''}`}
-                      onClick={() => markAsRead(notification.id, notification.link)}
-                    >
-                      <div className="flex flex-col gap-1">
-                        <p className="text-sm">{notification.message}</p>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-                        </span>
-                      </div>
-                    </DropdownMenuItem>
-                  ))
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <NotificationsPanel />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
