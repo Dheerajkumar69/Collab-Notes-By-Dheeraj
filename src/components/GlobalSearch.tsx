@@ -9,17 +9,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Search, FileText, Users, Hash } from 'lucide-react';
+import { Search, FileText, Users, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface SearchResult {
-  type: 'note' | 'group';
+  type: 'note' | 'message' | 'group';
   id: string;
   title: string;
   groupId?: string;
   groupName?: string;
   labels?: string[];
   snippet?: string;
+  rank?: number;
 }
 
 interface GlobalSearchProps {
