@@ -557,6 +557,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          onboarded_at: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -564,6 +565,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          onboarded_at?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -571,6 +573,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          onboarded_at?: string | null
         }
         Relationships: []
       }
