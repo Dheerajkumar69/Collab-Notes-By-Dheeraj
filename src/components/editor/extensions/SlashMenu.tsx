@@ -12,7 +12,7 @@ import tippy, { type Instance as TippyInstance } from 'tippy.js';
 import {
   Heading1, Heading2, Heading3, List, ListOrdered, ListChecks, Quote,
   Code as CodeIcon, Minus, Image as ImageIcon, Table as TableIcon,
-  Lightbulb, CheckCircle2, AlertTriangle, Octagon,
+  Lightbulb, CheckCircle2, AlertTriangle, Octagon, Pencil, Upload,
 } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import type { Editor, Range } from '@tiptap/core';
@@ -81,6 +81,32 @@ export const SLASH_ITEMS: SlashItem[] = [
       } else {
         editor.chain().focus().deleteRange(range).run();
       }
+    },
+  },
+  {
+    title: 'Upload image', keywords: ['upload', 'file', 'photo', 'picture'], icon: Upload,
+    command: ({ editor, range }) => {
+      // Trigger a hidden file input; the ImagePasteUpload plugin handles the actual upload.
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = () => {
+        const file = input.files?.[0];
+        editor.chain().focus().deleteRange(range).run();
+        if (!file) return;
+        // Simulate a paste event so the ImagePasteUpload plugin picks it up.
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        const evt = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true });
+        editor.view.dom.dispatchEvent(evt);
+      };
+      input.click();
+    },
+  },
+  {
+    title: 'Drawing', keywords: ['draw', 'sketch', 'canvas', 'whiteboard'], icon: Pencil,
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).insertDrawing().run();
     },
   },
   {
