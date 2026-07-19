@@ -40,6 +40,9 @@ import { ensureOutboxAutoFlush } from '@/lib/offline/notesOutbox';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { Callout } from './extensions/Callout';
 import { SlashCommands } from './extensions/SlashMenu';
+import { Autocorrect } from './extensions/Autocorrect';
+import { ImagePasteUpload } from './extensions/ImagePasteUpload';
+import { Drawing } from './extensions/Drawing';
 import { EditorToolbar } from './EditorToolbar';
 import { Loader2, WifiOff, Cloud, CheckCircle2 } from 'lucide-react';
 
@@ -55,6 +58,8 @@ function userColor(seed: string): string {
 
 export interface CollabEditorProps {
   noteId: string;
+  /** Group ID — required so pasted images are stored under the group path. */
+  groupId: string;
   /** Existing HTML content used to lazy-initialize the Y.Doc on first open. */
   initialHtml: string;
   /** Existing yjs_state from the database (if note already migrated). */
@@ -65,12 +70,15 @@ export interface CollabEditorProps {
   placeholder?: string;
   className?: string;
   onSavedStatus?: (status: 'saving' | 'saved' | 'offline' | 'error') => void;
+  /** Enable Grammarly-style typo autocorrect (default: true). */
+  autocorrect?: boolean;
 }
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'offline' | 'error';
 
 export function CollabEditor({
   noteId,
+  groupId,
   initialHtml,
   initialYjsState,
   currentUser,
@@ -78,6 +86,7 @@ export function CollabEditor({
   placeholder = 'Press "/" for commands, or just start writing…',
   className = '',
   onSavedStatus,
+  autocorrect = true,
 }: CollabEditorProps) {
   const online = useOnlineStatus();
   const [status, setStatus] = useState<SaveStatus>('idle');
@@ -143,6 +152,9 @@ export function CollabEditor({
       CharacterCount.configure({ limit: 200_000 }),
       Callout,
       SlashCommands,
+      Autocorrect.configure({ enabled: autocorrect }),
+      ImagePasteUpload.configure({ groupId, noteId, enabled: true }),
+      Drawing,
       GlobalDragHandle.configure({ dragHandleWidth: 20 }),
       AutoJoiner,
       Collaboration.configure({ document: ydoc }),

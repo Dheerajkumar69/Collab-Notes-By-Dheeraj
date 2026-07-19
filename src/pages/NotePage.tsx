@@ -709,6 +709,7 @@ export default function NotePage() {
             {canEdit ? (
               <CollabEditorSafe
                 noteId={note.id}
+                groupId={groupId!}
                 initialHtml={note.content || ''}
                 initialYjsState={decodeYjsState(note.yjs_state)}
                 currentUser={{
