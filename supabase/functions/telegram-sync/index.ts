@@ -222,6 +222,35 @@ async function deleteFromTelegram(
   return result.ok
 }
 
+async function sendImageToTelegram(
+  botToken: string,
+  channelId: string,
+  imageUrl: string,
+  caption: string,
+): Promise<{ messageId: string; fileId?: string }> {
+  // Fetch the image bytes server-side (works for signed URLs)
+  const imgRes = await fetch(imageUrl)
+  if (!imgRes.ok) throw new Error(`Failed to fetch image: ${imgRes.status}`)
+  const blob = await imgRes.blob()
+
+  const form = new FormData()
+  form.append('chat_id', channelId)
+  form.append('caption', caption.slice(0, 1000))
+  // Use sendDocument to preserve original quality; sendPhoto compresses.
+  form.append('document', blob, 'inline-image')
+
+  const res = await fetch(`${TELEGRAM_API}${botToken}/sendDocument`, {
+    method: 'POST',
+    body: form,
+  })
+  const json: TelegramResponse = await res.json()
+  if (!json.ok) throw new Error(`Telegram sendDocument error: ${json.description}`)
+  return {
+    messageId: String(json.result!.message_id),
+    fileId: json.result?.document?.file_id,
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -256,7 +285,16 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: req.headers.get('Authorization')! } },
     })
 
-    const { action, note, noteId, fileId } = await req.json()
+    const payload = await req.json()
+    const { action, note, noteId, fileId, groupId, imageUrl, filename } = payload as {
+      action: string
+      note?: NotePayload
+      noteId?: string
+      fileId?: string
+      groupId?: string
+      imageUrl?: string
+      filename?: string
+    }
 
     console.log(`Telegram sync action: ${action} by user: ${userId}`)
 
@@ -497,6 +535,38 @@ Deno.serve(async (req) => {
           JSON.stringify({ success: true, archived }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
+      }
+
+      case 'archive-image': {
+        if (!groupId || !imageUrl) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'groupId and imageUrl required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        if (!(await verifyGroupAccess(anonClient, groupId, userId))) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Access denied' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        try {
+          const caption = `🖼️ Inline image\n📁 Group: ${groupId}\n📝 Note: ${noteId || 'n/a'}\n📎 ${filename || 'image'}`
+          const { messageId, fileId: tgFileId } = await sendImageToTelegram(
+            botToken, channelId, imageUrl, caption,
+          )
+          return new Response(
+            JSON.stringify({ success: true, messageId, fileId: tgFileId }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        } catch (e) {
+          console.error('archive-image failed:', e)
+          return new Response(
+            JSON.stringify({ success: false, error: 'archive_failed' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
       }
 
       default:

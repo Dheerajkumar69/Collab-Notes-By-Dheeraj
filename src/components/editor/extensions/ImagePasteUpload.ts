@@ -67,6 +67,21 @@ async function uploadImage(file: File, groupId: string, noteId: string): Promise
     .from('note-attachments')
     .createSignedUrl(path, YEAR_SECONDS);
   if (signErr || !data?.signedUrl) throw signErr || new Error('Failed to sign URL');
+
+  // Fire-and-forget: archive a copy of the image into the Telegram backup channel.
+  // Never blocks the paste, never surfaces errors to the user.
+  void supabase.functions
+    .invoke('telegram-sync', {
+      body: {
+        action: 'archive-image',
+        groupId,
+        noteId,
+        imageUrl: data.signedUrl,
+        filename: file.name || `image.${ext}`,
+      },
+    })
+    .catch((err) => console.warn('[ImagePasteUpload] telegram archive skipped:', err));
+
   return data.signedUrl;
 }
 
