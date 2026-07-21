@@ -537,6 +537,38 @@ Deno.serve(async (req) => {
         )
       }
 
+      case 'archive-image': {
+        if (!groupId || !imageUrl) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'groupId and imageUrl required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        if (!(await verifyGroupAccess(anonClient, groupId, userId))) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Access denied' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        try {
+          const caption = `🖼️ Inline image\n📁 Group: ${groupId}\n📝 Note: ${noteId || 'n/a'}\n📎 ${filename || 'image'}`
+          const { messageId, fileId: tgFileId } = await sendImageToTelegram(
+            botToken, channelId, imageUrl, caption,
+          )
+          return new Response(
+            JSON.stringify({ success: true, messageId, fileId: tgFileId }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        } catch (e) {
+          console.error('archive-image failed:', e)
+          return new Response(
+            JSON.stringify({ success: false, error: 'archive_failed' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+      }
+
       default:
         throw new Error(`Unknown action: ${action}`)
     }
