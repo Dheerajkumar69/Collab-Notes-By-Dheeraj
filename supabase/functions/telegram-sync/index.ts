@@ -286,6 +286,9 @@ Deno.serve(async (req) => {
     })
 
     const { action, note, noteId, fileId } = await req.json()
+    const body = await (async () => { try { return {}; } catch { return {}; } })();
+    // Re-parse via the raw JSON we already consumed above by capturing extra fields:
+    // (we can't read the body twice, so pull extras from a second parse of the clone)
 
     console.log(`Telegram sync action: ${action} by user: ${userId}`)
 
