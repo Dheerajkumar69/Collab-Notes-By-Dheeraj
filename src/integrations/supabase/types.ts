@@ -691,6 +691,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_group_accessible: { Args: { gid: string }; Returns: boolean }
       join_group_with_code: {
         Args: { p_invite_code: string; p_user_email?: string }
         Returns: Json
