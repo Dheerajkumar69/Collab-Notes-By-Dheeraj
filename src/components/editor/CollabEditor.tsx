@@ -143,7 +143,9 @@ export function CollabEditor({
       Highlight,
       Underline,
       Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer nofollow', target: '_blank' } }),
-      Image.configure({ inline: false, allowBase64: false }),
+      // allowBase64 must be true so the paste-upload placeholder (a data: URL
+      // shown instantly while the real upload runs) is accepted by the schema.
+      Image.configure({ inline: false, allowBase64: true }),
       Table.configure({ resizable: true, lastColumnResizable: true, allowTableNodeSelection: true }),
       TableRow, TableCell, TableHeader,
       TaskList,
@@ -181,8 +183,15 @@ export function CollabEditor({
     },
     onUpdate: () => {
       persisterRef.current?.schedule();
-      setStatus('saving');
-      onSavedStatus?.('saving');
+      // Avoid re-rendering on every keystroke — only flip to "saving" once
+      // per burst. The persister debounces the actual write to 1.5s.
+      setStatus((prev) => {
+        if (prev !== 'saving') {
+          onSavedStatus?.('saving');
+          return 'saving';
+        }
+        return prev;
+      });
     },
   }, [ydoc, editable]);
 

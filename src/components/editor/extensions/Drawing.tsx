@@ -68,9 +68,9 @@ function DrawingView(props: NodeViewProps) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
     // Paint committed strokes.
-    for (const s of attrs.strokes) drawStroke(ctx, s);
+    for (const s of attrs.strokes) drawStroke(ctx, s, attrs.bg);
     // Paint in-progress stroke on top.
-    if (drawingRef.current) drawStroke(ctx, drawingRef.current);
+    if (drawingRef.current) drawStroke(ctx, drawingRef.current, attrs.bg);
   }, [attrs.strokes, attrs.bg]);
 
   // Keep the canvas backing store in sync with attribute dimensions.
@@ -246,14 +246,17 @@ function DrawingView(props: NodeViewProps) {
   );
 }
 
-function drawStroke(ctx: CanvasRenderingContext2D, s: Stroke) {
+function drawStroke(ctx: CanvasRenderingContext2D, s: Stroke, bg: string) {
   if (s.points.length < 2) return;
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   if (s.eraser) {
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.strokeStyle = 'rgba(0,0,0,1)';
+    // Paint over with the canvas background color so erased areas visually
+    // match the drawing surface (instead of punching transparent holes that
+    // reveal the parent element's dark theme background).
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = bg || '#ffffff';
   } else {
     ctx.strokeStyle = s.color;
   }
