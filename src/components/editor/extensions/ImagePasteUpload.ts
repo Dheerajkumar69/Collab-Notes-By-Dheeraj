@@ -44,11 +44,25 @@ async function fileToDataUrl(file: File): Promise<string> {
 async function uploadImage(file: File, groupId: string, noteId: string): Promise<string> {
   const ext = extFromMime(file.type, file.name.split('.').pop() || 'png');
   const path = `${groupId}/${noteId}/inline/${crypto.randomUUID()}.${ext}`;
+  // Preflight: ensure we have an authenticated session — RLS on
+  // note-attachments requires auth.uid() to match a group member/creator.
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData?.session) {
+    throw new Error('You are signed out — please sign in again to paste images.');
+  }
   const { error: upErr } = await supabase.storage.from('note-attachments').upload(path, file, {
     contentType: file.type || 'application/octet-stream',
     upsert: false,
   });
-  if (upErr) throw upErr;
+  if (upErr) {
+    const msg = upErr.message || '';
+    if (/row-level security|not authorized|permission/i.test(msg)) {
+      throw new Error(
+        "Can't save image — you must be a member of this group. Try refreshing the page.",
+      );
+    }
+    throw upErr;
+  }
   const { data, error: signErr } = await supabase.storage
     .from('note-attachments')
     .createSignedUrl(path, YEAR_SECONDS);
