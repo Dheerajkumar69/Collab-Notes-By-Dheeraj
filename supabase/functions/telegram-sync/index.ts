@@ -222,6 +222,35 @@ async function deleteFromTelegram(
   return result.ok
 }
 
+async function sendImageToTelegram(
+  botToken: string,
+  channelId: string,
+  imageUrl: string,
+  caption: string,
+): Promise<{ messageId: string; fileId?: string }> {
+  // Fetch the image bytes server-side (works for signed URLs)
+  const imgRes = await fetch(imageUrl)
+  if (!imgRes.ok) throw new Error(`Failed to fetch image: ${imgRes.status}`)
+  const blob = await imgRes.blob()
+
+  const form = new FormData()
+  form.append('chat_id', channelId)
+  form.append('caption', caption.slice(0, 1000))
+  // Use sendDocument to preserve original quality; sendPhoto compresses.
+  form.append('document', blob, 'inline-image')
+
+  const res = await fetch(`${TELEGRAM_API}${botToken}/sendDocument`, {
+    method: 'POST',
+    body: form,
+  })
+  const json: TelegramResponse = await res.json()
+  if (!json.ok) throw new Error(`Telegram sendDocument error: ${json.description}`)
+  return {
+    messageId: String(json.result!.message_id),
+    fileId: json.result?.document?.file_id,
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
