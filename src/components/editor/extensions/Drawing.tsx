@@ -252,8 +252,11 @@ function drawStroke(ctx: CanvasRenderingContext2D, s: Stroke) {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   if (s.eraser) {
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.strokeStyle = 'rgba(0,0,0,1)';
+    // Paint over with the canvas background color so erased areas visually
+    // match the drawing surface (instead of punching transparent holes that
+    // reveal the parent element's dark theme background).
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = (s as Stroke & { bg?: string }).bg || '#ffffff';
   } else {
     ctx.strokeStyle = s.color;
   }
