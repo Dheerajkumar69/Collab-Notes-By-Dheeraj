@@ -14,7 +14,7 @@
  *  - Extensible: add entries to DICTIONARY without touching the plugin.
  */
 import { Extension } from '@tiptap/core';
-import { InputRule } from '@tiptap/core';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
 
 // Common English typos. Left = wrong (lowercase), right = correct.
 // Kept intentionally short and safe — only unambiguous misspellings.
@@ -68,33 +68,48 @@ export const Autocorrect = Extension.create({
     return { enabled: true as boolean };
   },
 
-  addInputRules() {
+  addProseMirrorPlugins() {
     return [
-      new InputRule({
-        find: RULE,
-        handler: ({ state, range, match, chain }) => {
+      new Plugin({
+        key: new PluginKey('autocorrect'),
+        appendTransaction: (transactions, _oldState, newState) => {
           if (!this.options.enabled) return null;
+          if (!transactions.some((tr) => tr.docChanged) || transactions.some((tr) => tr.getMeta('autocorrect'))) {
+            return null;
+          }
+
+          const { selection } = newState;
+          if (!selection.empty) return null;
+
+          const cursor = selection.from;
+          const $from = newState.doc.resolve(cursor);
+
+          // Never rewrite inside code blocks or inline code.
+          for (let d = $from.depth; d > 0; d--) {
+            const nodeName = $from.node(d).type.name;
+            if (nodeName === 'codeBlock') return null;
+          }
+          if ($from.marks().some((m) => m.type.name === 'code')) return null;
+
+          const parentStart = $from.start();
+          const lookBehindFrom = Math.max(parentStart, cursor - 80);
+          const textBefore = newState.doc.textBetween(lookBehindFrom, cursor, '\n', '\0');
+          const match = textBefore.match(RULE);
+          if (!match) return null;
+
           const wrong = match[1];
           const boundary = match[2];
           const lower = wrong.toLowerCase();
           const fix = DICTIONARY[lower];
           if (!fix || fix.toLowerCase() === lower) return null;
 
-          // Never rewrite inside code blocks or inline code.
-          const $from = state.doc.resolve(range.from);
-          for (let d = $from.depth; d > 0; d--) {
-            const nodeName = $from.node(d).type.name;
-            if (nodeName === 'codeBlock') return null;
-          }
-          const marks = state.doc.resolve(range.from + 1).marks();
-          if (marks.some((m) => m.type.name === 'code')) return null;
-
           const cased = matchCase(wrong, fix);
-          // range covers the matched substring; we replace [wrong + boundary] with [fixed + boundary].
-          const start = range.to - match[0].length;
-          const end = range.to;
-          chain().insertContentAt({ from: start, to: end }, `${cased}${boundary}`).run();
-          return null;
+          const start = cursor - match[0].length;
+          const end = cursor;
+
+          return newState.tr
+            .insertText(`${cased}${boundary}`, start, end)
+            .setMeta('autocorrect', true);
         },
       }),
     ];

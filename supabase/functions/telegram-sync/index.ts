@@ -88,23 +88,15 @@ async function verifyGroupAccess(
   groupId: string,
   userId: string
 ): Promise<boolean> {
-  const { data: group } = await supabase
-    .from('groups')
-    .select('created_by, members')
-    .eq('id', groupId)
-    .single()
+  if (!groupId || !userId) return false
 
-  if (!group) return false
-  if (group.created_by === userId) return true
+  const { data, error } = await supabase.rpc('is_group_accessible', { gid: groupId })
+  if (error) {
+    console.error('verifyGroupAccess failed:', error)
+    return false
+  }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('email')
-    .eq('id', userId)
-    .single()
-
-  if (!profile) return false
-  return (group.members || []).includes(profile.email)
+  return data === true
 }
 
 async function sendToTelegram(
