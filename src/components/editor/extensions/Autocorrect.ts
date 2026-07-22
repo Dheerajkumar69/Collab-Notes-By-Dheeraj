@@ -57,10 +57,6 @@ function matchCase(source: string, target: string): string {
   return target;
 }
 
-// Fires after a word boundary character. Captures the previous word.
-// Note: InputRule's regex runs against the text ending at the cursor.
-const RULE = /(\b[A-Za-z']+)(\s|[.,!?;:])$/;
-
 export const Autocorrect = Extension.create({
   name: 'autocorrect',
 
