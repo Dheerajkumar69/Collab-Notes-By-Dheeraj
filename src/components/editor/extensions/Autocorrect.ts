@@ -72,44 +72,40 @@ export const Autocorrect = Extension.create({
     return [
       new Plugin({
         key: new PluginKey('autocorrect'),
-        appendTransaction: (transactions, _oldState, newState) => {
-          if (!this.options.enabled) return null;
-          if (!transactions.some((tr) => tr.docChanged) || transactions.some((tr) => tr.getMeta('autocorrect'))) {
-            return null;
-          }
+        props: {
+          handleTextInput: (view, from, to, text) => {
+            if (!this.options.enabled || !/^\s$|^[.,!?;:]$/.test(text)) return false;
 
-          const { selection } = newState;
-          if (!selection.empty) return null;
+            const { state } = view;
+            const $from = state.doc.resolve(from);
 
-          const cursor = selection.from;
-          const $from = newState.doc.resolve(cursor);
+            // Never rewrite inside code blocks or inline code.
+            for (let d = $from.depth; d > 0; d--) {
+              const nodeName = $from.node(d).type.name;
+              if (nodeName === 'codeBlock') return false;
+            }
+            if ($from.marks().some((m) => m.type.name === 'code')) return false;
 
-          // Never rewrite inside code blocks or inline code.
-          for (let d = $from.depth; d > 0; d--) {
-            const nodeName = $from.node(d).type.name;
-            if (nodeName === 'codeBlock') return null;
-          }
-          if ($from.marks().some((m) => m.type.name === 'code')) return null;
+            const parentStart = $from.start();
+            const lookBehindFrom = Math.max(parentStart, from - 80);
+            const textBefore = state.doc.textBetween(lookBehindFrom, from, '\n', '\0');
+            const match = textBefore.match(/(\b[A-Za-z']+)$/);
+            if (!match) return false;
 
-          const parentStart = $from.start();
-          const lookBehindFrom = Math.max(parentStart, cursor - 80);
-          const textBefore = newState.doc.textBetween(lookBehindFrom, cursor, '\n', '\0');
-          const match = textBefore.match(RULE);
-          if (!match) return null;
+            const wrong = match[1];
+            const lower = wrong.toLowerCase();
+            const fix = DICTIONARY[lower];
+            if (!fix || fix.toLowerCase() === lower) return false;
 
-          const wrong = match[1];
-          const boundary = match[2];
-          const lower = wrong.toLowerCase();
-          const fix = DICTIONARY[lower];
-          if (!fix || fix.toLowerCase() === lower) return null;
-
-          const cased = matchCase(wrong, fix);
-          const start = cursor - match[0].length;
-          const end = cursor;
-
-          return newState.tr
-            .insertText(`${cased}${boundary}`, start, end)
-            .setMeta('autocorrect', true);
+            const cased = matchCase(wrong, fix);
+            const start = from - wrong.length;
+            view.dispatch(
+              state.tr
+                .insertText(`${cased}${text}`, start, to)
+                .setMeta('autocorrect', true),
+            );
+            return true;
+          },
         },
       }),
     ];
