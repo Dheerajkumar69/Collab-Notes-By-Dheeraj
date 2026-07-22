@@ -14,7 +14,7 @@
  *  - Extensible: add entries to DICTIONARY without touching the plugin.
  */
 import { Extension } from '@tiptap/core';
-import { InputRule } from '@tiptap/core';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
 
 // Common English typos. Left = wrong (lowercase), right = correct.
 // Kept intentionally short and safe — only unambiguous misspellings.
@@ -57,10 +57,6 @@ function matchCase(source: string, target: string): string {
   return target;
 }
 
-// Fires after a word boundary character. Captures the previous word.
-// Note: InputRule's regex runs against the text ending at the cursor.
-const RULE = /(\b[A-Za-z']+)(\s|[.,!?;:])$/;
-
 export const Autocorrect = Extension.create({
   name: 'autocorrect',
 
@@ -68,33 +64,44 @@ export const Autocorrect = Extension.create({
     return { enabled: true as boolean };
   },
 
-  addInputRules() {
+  addProseMirrorPlugins() {
     return [
-      new InputRule({
-        find: RULE,
-        handler: ({ state, range, match, chain }) => {
-          if (!this.options.enabled) return null;
-          const wrong = match[1];
-          const boundary = match[2];
-          const lower = wrong.toLowerCase();
-          const fix = DICTIONARY[lower];
-          if (!fix || fix.toLowerCase() === lower) return null;
+      new Plugin({
+        key: new PluginKey('autocorrect'),
+        props: {
+          handleTextInput: (view, from, to, text) => {
+            if (!this.options.enabled || !/^\s$|^[.,!?;:]$/.test(text)) return false;
 
-          // Never rewrite inside code blocks or inline code.
-          const $from = state.doc.resolve(range.from);
-          for (let d = $from.depth; d > 0; d--) {
-            const nodeName = $from.node(d).type.name;
-            if (nodeName === 'codeBlock') return null;
-          }
-          const marks = state.doc.resolve(range.from + 1).marks();
-          if (marks.some((m) => m.type.name === 'code')) return null;
+            const { state } = view;
+            const $from = state.doc.resolve(from);
 
-          const cased = matchCase(wrong, fix);
-          // range covers the matched substring; we replace [wrong + boundary] with [fixed + boundary].
-          const start = range.to - match[0].length;
-          const end = range.to;
-          chain().insertContentAt({ from: start, to: end }, `${cased}${boundary}`).run();
-          return null;
+            // Never rewrite inside code blocks or inline code.
+            for (let d = $from.depth; d > 0; d--) {
+              const nodeName = $from.node(d).type.name;
+              if (nodeName === 'codeBlock') return false;
+            }
+            if ($from.marks().some((m) => m.type.name === 'code')) return false;
+
+            const parentStart = $from.start();
+            const lookBehindFrom = Math.max(parentStart, from - 80);
+            const textBefore = state.doc.textBetween(lookBehindFrom, from, '\n', '\0');
+            const match = textBefore.match(/(\b[A-Za-z']+)$/);
+            if (!match) return false;
+
+            const wrong = match[1];
+            const lower = wrong.toLowerCase();
+            const fix = DICTIONARY[lower];
+            if (!fix || fix.toLowerCase() === lower) return false;
+
+            const cased = matchCase(wrong, fix);
+            const start = from - wrong.length;
+            view.dispatch(
+              state.tr
+                .insertText(`${cased}${text}`, start, to)
+                .setMeta('autocorrect', true),
+            );
+            return true;
+          },
         },
       }),
     ];
