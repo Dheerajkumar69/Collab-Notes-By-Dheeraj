@@ -49,6 +49,17 @@
 .collab-editor [data-callout] > * { margin: 0.25em 0; }
 
 /* Placeholder */
+/* AI grammar cat suggestions */
+.collab-editor .grammar-error {
+  text-decoration: underline wavy hsl(0 84% 60% / 0.9);
+  text-underline-offset: 3px;
+  border-radius: 2px;
+}
+.collab-editor .grammar-error--active {
+  background: hsl(38 92% 50% / 0.18);
+  text-decoration-color: hsl(38 92% 50%);
+}
+
 .collab-editor p.is-editor-empty:first-child::before {
   content: attr(data-placeholder); color: hsl(var(--muted-foreground));
   float: left; height: 0; pointer-events: none;
