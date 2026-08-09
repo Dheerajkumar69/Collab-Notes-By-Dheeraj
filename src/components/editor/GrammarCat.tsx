@@ -41,9 +41,15 @@ export function GrammarCat({ editor, enabled = true }: Props) {
     if (!editor || editor.isDestroyed || !enabled) return;
     if (inFlight.current || Date.now() < cooldownUntil.current) return;
 
-    const text = editor.state.doc.textBetween(0, editor.state.doc.content.size, '\n', ' ').trim();
-    if (text.length < MIN_CHARS) return;
-    const payload = text.slice(-MAX_CHARS);
+    // Read a window centred on the cursor so long notes still get checked
+    // where the writer is actually working.
+    const size = editor.state.doc.content.size;
+    const cursor = editor.state.selection.from;
+    const half = Math.floor(MAX_CHARS / 2);
+    const from = Math.max(0, cursor - half);
+    const to = Math.min(size, cursor + half);
+    const payload = editor.state.doc.textBetween(from, to, '\n', ' ').trim();
+    if (payload.length < MIN_CHARS) return;
     if (payload === lastChecked.current) return;
 
     inFlight.current = true;
