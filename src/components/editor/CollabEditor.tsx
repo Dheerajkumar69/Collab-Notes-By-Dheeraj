@@ -41,6 +41,8 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { Callout } from './extensions/Callout';
 import { SlashCommands } from './extensions/SlashMenu';
 import { Autocorrect } from './extensions/Autocorrect';
+import { GrammarSuggestions } from './extensions/GrammarSuggestions';
+import { GrammarCat } from './GrammarCat';
 import { ImagePasteUpload } from './extensions/ImagePasteUpload';
 import { Drawing } from './extensions/Drawing';
 import { EditorToolbar } from './EditorToolbar';
@@ -155,6 +157,7 @@ export function CollabEditor({
       Callout,
       SlashCommands,
       Autocorrect.configure({ enabled: autocorrect }),
+      GrammarSuggestions.configure({ enabled: autocorrect }),
       ImagePasteUpload.configure({ groupId, noteId, enabled: true }),
       Drawing,
       GlobalDragHandle.configure({ dragHandleWidth: 20 }),
@@ -249,6 +252,7 @@ export function CollabEditor({
       {editable && <EditorToolbar editor={editor} />}
       <div className="relative">
         <EditorContent editor={editor} />
+        {editable && <GrammarCat editor={editor} enabled={autocorrect} />}
         {!ready && (
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 to-purple-500 animate-pulse" />
         )}
