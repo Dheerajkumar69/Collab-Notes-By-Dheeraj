@@ -190,20 +190,8 @@ export const GrammarSuggestions = Extension.create<GrammarOptions>({
     };
   },
 
-  addKeyboardShortcuts() {
-    return {
-      Tab: () => {
-        const items = grammarKey.getState(this.editor.state)?.items ?? [];
-        if (!items.length) return false;
-        return this.editor.commands.acceptGrammarSuggestion();
-      },
-      Escape: () => {
-        const items = grammarKey.getState(this.editor.state)?.items ?? [];
-        if (!items.length) return false;
-        return this.editor.commands.clearGrammarSuggestions();
-      },
-    };
-  },
+  // Tab / Escape are handled in the React layer (GrammarCat) so Tab can be
+  // two-stage: first reveal the flagged word, then apply the fix.
 
   addProseMirrorPlugins() {
     const options = this.options;
