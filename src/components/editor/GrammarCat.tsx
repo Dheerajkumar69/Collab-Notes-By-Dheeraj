@@ -298,16 +298,16 @@ export function GrammarCat({ editor, enabled = true }: Props) {
     editor.commands.dismissGrammarSuggestion(active.id);
   }, [editor, active]);
 
-  /** Two-stage Tab: first reveal the word, then fix it. */
+  /** One Tab when the word is on screen; two when it's scrolled out of view. */
   const handleTab = useCallback(() => {
     if (!active) return false;
-    if (!revealed || offscreen) {
+    if (offscreen && !revealed) {
       reveal();
       return true;
     }
     accept();
     return true;
-  }, [active, revealed, offscreen, reveal, accept]);
+  }, [active, offscreen, revealed, reveal, accept]);
 
   // Intercept Tab / Escape before ProseMirror sees them.
   useEffect(() => {
@@ -334,7 +334,7 @@ export function GrammarCat({ editor, enabled = true }: Props) {
 
   const hint = useMemo(() => {
     if (!active) return null;
-    if (offscreen || !revealed) return 'Tab · go to word';
+    if (offscreen && !revealed) return 'Tab · go to word';
     return 'Tab · fix';
   }, [active, offscreen, revealed]);
 
@@ -391,7 +391,7 @@ export function GrammarCat({ editor, enabled = true }: Props) {
                     onClick={() => handleTab()}
                     className="rounded-md bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground hover:opacity-90"
                   >
-                    {offscreen || !revealed ? 'Go · Tab' : 'Fix · Tab'}
+                    {offscreen && !revealed ? 'Go · Tab' : 'Fix · Tab'}
                   </button>
                   <button
                     type="button"
