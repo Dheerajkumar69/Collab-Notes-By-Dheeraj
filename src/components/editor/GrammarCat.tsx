@@ -219,10 +219,31 @@ export function GrammarCat({ editor, enabled = true }: Props) {
     if (!container) return;
 
     let raf = 0;
+    /** Height of any fixed/sticky chrome overlapping the top of the viewport. */
+    const topObstruction = () => {
+      let top = 0;
+      try {
+        const candidates = document.querySelectorAll('header, [data-app-header], nav');
+        candidates.forEach((el) => {
+          const style = window.getComputedStyle(el);
+          if (style.position !== 'fixed' && style.position !== 'sticky') return;
+          if (style.visibility === 'hidden' || style.display === 'none') return;
+          const r = el.getBoundingClientRect();
+          if (r.height === 0) return;
+          // Only chrome pinned to the top of the screen counts.
+          if (r.top <= 4 && r.bottom > top) top = r.bottom;
+        });
+      } catch {
+        /* ignore */
+      }
+      return top;
+    };
+
     const place = () => {
       if (!editor || editor.isDestroyed) return;
       const rect = container.getBoundingClientRect();
-      const viewTop = Math.max(rect.top, 0);
+      const safeTop = topObstruction() + 8;
+      const viewTop = Math.max(rect.top, safeTop);
       const viewBottom = Math.min(rect.bottom, window.innerHeight || rect.bottom);
       // Coordinates relative to the container, clamped to the visible band.
       const minY = Math.max(0, viewTop - rect.top + 8);
